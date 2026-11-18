@@ -1,0 +1,207 @@
+"""The Markdown editor surface with VNote-style in-place preview.
+
+``MTextEdit`` is a ``QTextEdit`` specialised for Markdown. Unlike a side-by-side
+editor/preview layout, it renders previews *inside* the editing surface: for the
+block types VNote previews (fenced code, tables, images) a band is reserved above
+the source block and the rendered preview is painted into it, while regular text
+stays as editable Markdown source.
+
+This mirrors VNote's ``TextDocumentLayout`` intent with a simpler mechanism --
+block top-margins reserve the band, and ``paintEvent`` draws into it -- so the
+component stays small and portable while giving the same single-pane experience.
+
+The editor knows nothing about notebooks or the application shell, so it can be
+embedded in any PyQt6 project (e.g. the fourth panel of an e-Sword-like tool).
+"""
+
+from __future__ import annotations
+
+import os
+from typing import List, Optional
+
+from PyQt6.QtCore import QRectF, QTimer, pyqtSignal
+from PyQt6.QtGui import QPainter, QTextCursor
+from PyQt6.QtWidgets import QTextEdit
+
+from . import inplace
+from .highlighter import MarkdownHighlighter
+
+
+class MTextEdit(QTextEdit):
+    # Emitted (debounced) with the full document source whenever the user edits.
+    renderRequested = pyqtSignal(str)
+
+    def __init__(self, parent=None, render_delay_ms: int = 120):
+        super().__init__(parent)
+        self._highlighter = MarkdownHighlighter(self.document())
+        self._timer = QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.setInterval(render_delay_ms)
+        self._timer.timeout.connect(self._emit_render)
+        self.textChanged.connect(self._on_text_changed)
+
+        self.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
+        self.setAcceptRichText(False)
+
+        self._base_path: Optional[str] = None
+        self._inplace_enabled = True
+        self._specs: List[inplace.PreviewSpec] = []
+        self._spec_blocks: set = set()
+        self._applying = False  # guards the textChanged fired by block formats
+        self._last_emitted_text = ""  # text-compare guard (block formats fire textChanged)
+        self._manager = None
+        self._images: dict = {}  # abs_path -> QImage decoded off-thread (D13)
+        self._image_paster = None  # host hook: (QImage) -> markdown path | None
+
+    # -- render wiring -------------------------------------------------------
+    def _on_text_changed(self):
+        if self._applying:
+            return
+        # Block top-margin changes fire textChanged but do not alter the text;
+        # comparing against the last rendered text prevents a render loop.
+        if self.toPlainText() == self._last_emitted_text:
+            return
+        self._timer.start()
+
+    def _emit_render(self):
+        text = self.toPlainText()
+        if text == self._last_emitted_text:
+            return
+        self._last_emitted_text = text
+        self.renderRequested.emit(text)
+
+    def set_render_manager(self, manager):
+        """Attach the editor to a RenderManager (highlight regions + images)."""
+        self._manager = manager
+        self._highlighter.set_manager(manager)
+        if manager is not None:
+            manager.set_base_path(self._base_path)
+
+    # -- document helpers ----------------------------------------------------
+    def load_file(self, path: str):
+        self.set_base_path(os.path.dirname(os.path.abspath(path)))
+        with open(path, "r", encoding="utf-8") as fh:
+            self.setPlainText(fh.read())
+
+    def set_base_path(self, path: Optional[str]):
+        self._base_path = path
+        if self._manager is not None:
+            self._manager.set_base_path(path)
+
+    # -- paste ---------------------------------------------------------------
+
+    def set_image_paster(self, callback):
+        """Install a host hook for pasted images.
+
+        ``callback(image: QImage) -> str | None`` stores the image and returns
+        the path to embed (relative to the note), or ``None`` to decline. The
+        editor stays notebook-agnostic; the host owns asset storage.
+        """
+        self._image_paster = callback
+
+    def insertFromMimeData(self, source):
+        if self._image_paster is not None and source.hasImage():
+            image = source.imageData()
+            path = self._image_paster(image) if image is not None else None
+            if path:
+                self.textCursor().insertText(f"![]({path})")
+                return
+        super().insertFromMimeData(source)
+
+    def goToLine(self, line: int):
+        """Move the cursor to the start of ``line`` (0-based) and reveal it."""
+        block = self.document().findBlockByNumber(line)
+        if not block.isValid():
+            return
+        cursor = self.textCursor()
+        cursor.setPosition(block.position())
+        self.setTextCursor(cursor)
+        self.centerCursor()
+
+    def current_line(self) -> int:
+        return self.textCursor().blockNumber()
+
+    # -- in-place preview ----------------------------------------------------
+    def set_inplace_preview_enabled(self, enabled: bool):
+        self._inplace_enabled = bool(enabled)
+        if not self._inplace_enabled:
+            self._apply_specs([])
+        self.viewport().update()
+
+    def inplace_preview_enabled(self) -> bool:
+        return self._inplace_enabled
+
+    def set_preview_images(self, images: dict):
+        """Receive images decoded off-thread (QImage) from the render pipeline."""
+        self._images = dict(images)
+
+    def _image_lookup(self, abs_path: str):
+        return self._images.get(abs_path)
+
+    def set_preview_tokens(self, tokens):
+        """Build and apply preview specs from a parsed token stream."""
+        if not self._inplace_enabled:
+            return
+        specs = inplace.build_specs(tokens, self._base_path)
+        available = max(200, self.viewport().width() - 16)
+        specs = inplace.measure_specs(specs, available, self._image_lookup)
+        self._apply_specs(specs)
+
+    def _apply_specs(self, specs: List[inplace.PreviewSpec]):
+        # Setting a block format fires textChanged; suppress the render loop.
+        self._applying = True
+        try:
+            doc = self.document()
+            for bnum in self._spec_blocks:
+                block = doc.findBlockByNumber(bnum)
+                if not block.isValid():
+                    continue
+                fmt = block.blockFormat()
+                if fmt.topMargin() != 0:
+                    fmt.setTopMargin(0)
+                    QTextCursor(block).setBlockFormat(fmt)
+            self._spec_blocks = set()
+
+            for spec in specs:
+                block = doc.findBlockByNumber(spec.block)
+                if not block.isValid():
+                    continue
+                fmt = block.blockFormat()
+                fmt.setTopMargin(float(spec.height))
+                QTextCursor(block).setBlockFormat(fmt)
+                self._spec_blocks.add(spec.block)
+        finally:
+            self._applying = False
+        self._specs = specs
+        self.viewport().update()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        # Width changed: re-measure image previews against the new width.
+        if self._inplace_enabled and self._specs:
+            available = max(200, self.viewport().width() - 16)
+            self._specs = inplace.measure_specs(
+                self._specs, available, self._image_lookup
+            )
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        if not self._inplace_enabled or not self._specs:
+            return
+        painter = QPainter(self.viewport())
+        painter.setClipRect(event.rect())
+        doc = self.document()
+        width = self.viewport().width()
+        event_rect = QRectF(event.rect())
+        for spec in self._specs:
+            block = doc.findBlockByNumber(spec.block)
+            if not block.isValid():
+                continue
+            caret = self.cursorRect(QTextCursor(block))
+            margin = int(spec.height)
+            band = QRectF(caret.left(), caret.top() - margin,
+                          width - caret.left() - 6, margin)
+            if not band.intersects(event_rect):
+                continue
+            inplace.paint_spec(painter, spec, band)
+        painter.end()
