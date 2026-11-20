@@ -369,14 +369,15 @@ writing a text engine; this module is our implementation, and only the
 architecture was studied (VNote is LGPL-3.0; no code copied).
 
 **Consequences.** Phase 1 covers plain blocks, span/region formats,
-concealment, cursor, selection (including full-width selection) and hit
-testing. IME (Input Method Editor) pre-edit text is read from the block's
-layout and painted underlined; the commit reachable from it updates the
-document normally. Unaffected block layouts are reused across edits, so typing
-rebuilds only the edited block; the block walk is still O(blocks).
+concealment (inline markers and ATX heading hashes), cursor, selection
+(including full-width selection) and hit testing. Code-block regions get the
+shared code background and left border; nested lists get vertical guides at
+their indentation levels. IME (Input Method Editor) pre-edit text is read from
+the block's layout and painted underlined; the commit reachable from it updates
+the document normally. Unaffected block layouts are reused across edits, so
+typing rebuilds only the edited block; the block walk is still O(blocks).
 
-Not covered yet: inline images/math/tables, code-block backgrounds, list
-guides, and accessibility verification.
+Not covered yet: inline images/math/tables and accessibility verification.
 
 ---
 

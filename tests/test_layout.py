@@ -33,7 +33,8 @@ from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication, QTextEdit
 
 from mtextedit import MTextEdit, mdparse
-from mtextedit.layout import MarkdownDocumentLayout
+from mtextedit._markdown import collect_block_regions
+from mtextedit.layout import MarkdownDocumentLayout, _list_level
 
 
 class LayoutTest(unittest.TestCase):
@@ -51,7 +52,9 @@ class LayoutTest(unittest.TestCase):
         layout = MarkdownDocumentLayout(editor.document())
         editor.document().setDocumentLayout(layout)
         editor.setPlainText(text)
-        layout.set_spans(mdparse.parse_document(text).spans)
+        parsed = mdparse.parse_document(text)
+        layout.set_spans(parsed.spans)
+        layout.set_regions(collect_block_regions(parsed.tokens))
         layout.set_cursor_block(cursor_block)
         editor.resize(500, 200)
         editor.show()
@@ -203,6 +206,30 @@ class LayoutTest(unittest.TestCase):
         painter.end()
         pixel = image.pixelColor(230, 8)
         self.assertEqual(pixel.name(), "#ff0000")
+
+    def test_heading_markers_are_concealed_off_the_cursor_line(self):
+        _editor, off = self._editor("# Title", cursor_block=-1)
+        self.assertEqual(off._blocks[0].display, "Title")
+        _editor, on = self._editor("# Title", cursor_block=0)
+        self.assertEqual(on._blocks[0].display, "# Title")
+
+    def test_code_block_background_is_painted(self):
+        editor, layout = self._editor("```\ncode\n```", cursor_block=-1)
+        image = QImage(300, 160, QImage.Format.Format_ARGB32)
+        image.fill(QColor("white"))
+        painter = QPainter(image)
+        layout.draw(painter, QAbstractTextDocumentLayout.PaintContext())
+        painter.end()
+        block = editor.document().findBlockByNumber(1)
+        rect = layout.blockBoundingRect(block)
+        self.assertEqual(image.pixelColor(120, int(rect.top() + 3)).name(),
+                         "#f6f8fa")
+
+    def test_list_levels_from_source_indentation(self):
+        self.assertEqual(_list_level("- a"), 1)
+        self.assertEqual(_list_level("  - b"), 2)
+        self.assertEqual(_list_level("    - c"), 3)
+        self.assertEqual(_list_level("continuation"), 0)
 
 
 if __name__ == "__main__":

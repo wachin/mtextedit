@@ -24,6 +24,7 @@ is original and only the behaviour/architecture was studied. See
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from PyQt6.QtCore import QPointF, QRectF, QSizeF, Qt
@@ -31,6 +32,7 @@ from PyQt6.QtGui import (
     QAbstractTextDocumentLayout,
     QColor,
     QFont,
+    QPen,
     QTextBlock,
     QTextCharFormat,
     QTextFormat,
@@ -38,6 +40,7 @@ from PyQt6.QtGui import (
     QTextOption,
 )
 
+from .code_style import CODE_BG, CODE_BORDER
 from .theme import Format, Theme, load_default
 
 
@@ -101,6 +104,14 @@ class _BlockLayout:
             return 0.0
         return max(self.layout.lineAt(i).naturalTextWidth()
                    for i in range(self.layout.lineCount()))
+
+
+def _list_level(text: str) -> int:
+    """Nesting level from leading spaces (two spaces per level)."""
+    stripped = text.lstrip(" ")
+    if not stripped or not (stripped[0] in "-*+" or stripped[0].isdigit()):
+        return 0
+    return (len(text) - len(stripped)) // 2 + 1
 
 
 def _visible_map(text: str, hidden: list[tuple[int, int]]):
@@ -240,6 +251,11 @@ class MarkdownDocumentLayout(QAbstractTextDocumentLayout):
         start = block.position()
         end = start + len(block.text())
         ranges: list[tuple[int, int]] = []
+        region = self._region_for(block.blockNumber())
+        if region is not None and region.get("kind") == "heading":
+            heading = re.match(r"^(\s{0,3})(#{1,6})(\s+)", block.text())
+            if heading:
+                ranges.append((heading.start(2), heading.end(3)))
         for span in self._spans:
             if span.end <= start or span.start >= end:
                 continue
@@ -335,21 +351,26 @@ class MarkdownDocumentLayout(QAbstractTextDocumentLayout):
         self._blocks[number] = entry
         return entry
 
-    def _base_format(self, block: QTextBlock) -> QTextCharFormat | None:
-        number = block.blockNumber()
+    def _region_for(self, number: int):
         for region in self._regions:
             if region["start"] <= number <= region["end"]:
-                kind = region["kind"]
-                if kind == "heading":
-                    level = min(max(region.get("level", 1), 1), 6)
-                    return self._heading_formats[level - 1]
-                if kind == "code":
-                    return self._code_format
-                if kind == "quote":
-                    return self._quote_format
-                if kind == "hr":
-                    return self._hr_format
-                return None
+                return region
+        return None
+
+    def _base_format(self, block: QTextBlock) -> QTextCharFormat | None:
+        region = self._region_for(block.blockNumber())
+        if region is None:
+            return None
+        kind = region["kind"]
+        if kind == "heading":
+            level = min(max(region.get("level", 1), 1), 6)
+            return self._heading_formats[level - 1]
+        if kind == "code":
+            return self._code_format
+        if kind == "quote":
+            return self._quote_format
+        if kind == "hr":
+            return self._hr_format
         return None
 
     # -- QAbstractTextDocumentLayout ----------------------------------------
@@ -418,6 +439,33 @@ class MarkdownDocumentLayout(QAbstractTextDocumentLayout):
             rect = QRectF(offset, QSizeF(entry.width, entry.height))
             if clip.isValid() and not clip.intersects(rect):
                 continue
+
+            region = self._region_for(number)
+            content_height = max(
+                0.0, entry.height - entry.top_margin - entry.bottom_margin)
+            if region is not None and region.get("kind") == "code":
+                band = QRectF(rect.left(), entry.text_top,
+                              max(rect.width(), self._width - margin * 2),
+                              content_height)
+                painter.fillRect(band, QColor(CODE_BG))
+                painter.fillRect(
+                    QRectF(rect.left(), entry.text_top, 2.0, content_height),
+                    QColor(CODE_BORDER))
+            if region is not None and region.get("kind") == "list":
+                level = _list_level(entry.block.text())
+                if level:
+                    guide = QColor(
+                        self._theme.syntax_style("LIST_BULLET").color or "#d33682")
+                    guide.setAlpha(110)
+                    pen = QPen(guide)
+                    pen.setWidth(1)
+                    old_pen = painter.pen()
+                    painter.setPen(pen)
+                    for depth in range(1, level + 1):
+                        x = margin + 2 + (depth - 1) * 16
+                        painter.drawLine(QPointF(x, entry.text_top),
+                                         QPointF(x, entry.text_top + content_height))
+                    painter.setPen(old_pen)
 
             for selection in context.selections:
                 if (not selection.cursor.hasSelection()
