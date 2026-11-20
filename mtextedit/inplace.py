@@ -7,7 +7,7 @@ as editable Markdown source -- exactly VNote's in-place preview, but implemented
 with block top-margins instead of a custom ``QAbstractTextDocumentLayout``.
 
 The editor (``MTextEdit``) owns the reservation and painting; this module only
-knows how to turn a markdown-it token stream into specs, measure them and draw
+knows how to turn a token stream into specs, measure them and draw
 them.
 """
 
@@ -33,6 +33,10 @@ _PAD = 8
 _TITLE_H = 16
 _ROW_H = 24
 _MAX_H = 420
+# Table columns: never narrower than this, and never squeezed below the cell's
+# own text plus its horizontal padding when measuring.
+_MIN_COL_W = 48.0
+_CELL_PAD = 4
 _CODE_BG = QColor(CODE_BG)
 _CODE_BORDER = QColor(CODE_BORDER)
 _CODE_FG = QColor(CODE_TEXT)
@@ -171,6 +175,35 @@ def _code_font() -> QFont:
     return f
 
 
+def _table_font() -> QFont:
+    f = QFont()
+    f.setPointSize(9)
+    return f
+
+
+def column_widths(rows: list[list[dict[str, str]]], available: float,
+                  metrics: QFontMetricsF) -> list[float]:
+    """Content-proportional column widths that still fill ``available``.
+
+    Equal widths used to clip every cell of a table whose columns carry very
+    different amounts of text. Weighting each column by its widest cell gives
+    the text room; cells that still do not fit are elided when painted. A floor
+    keeps an empty or one-character column from collapsing.
+    """
+    ncols = max((len(row) for row in rows), default=0)
+    if not ncols:
+        return []
+    natural: list[float] = []
+    for c_index in range(ncols):
+        widest = 0.0
+        for row in rows:
+            text = row[c_index]["text"] if c_index < len(row) else ""
+            widest = max(widest, metrics.horizontalAdvance(text))
+        natural.append(max(_MIN_COL_W, widest + _CELL_PAD * 2))
+    total = sum(natural) or 1.0
+    return [available * width / total for width in natural]
+
+
 def measure_specs(
     specs: List[PreviewSpec],
     available_width: int,
@@ -195,6 +228,9 @@ def measure_specs(
         elif spec.kind == "table":
             rows = spec.data.get("rows", [])
             spec.height = min(_PAD * 2 + len(rows) * _ROW_H, _MAX_H)
+            spec.data["col_widths"] = column_widths(
+                rows, max(1.0, available_width - 2),
+                QFontMetricsF(_table_font()))
         elif spec.kind == "image":
             pix = _image_pixmap(spec, image_provider)
             if pix is None or pix.isNull():
@@ -305,10 +341,14 @@ def _paint_table(painter: QPainter, spec: PreviewSpec, rect: QRectF) -> None:
     if not rows:
         return
     ncols = max(len(r) for r in rows)
-    col_w = (rect.width() - 2) / max(1, ncols)
+    widths = spec.data.get("col_widths") or []
+    if len(widths) != ncols:  # spec built without measurement
+        widths = [(rect.width() - 2) / max(1, ncols)] * ncols
     painter.setPen(QPen(_GRID, 1))
-    f = QFont(); f.setPointSize(9)
-    painter.setFont(f)
+    f = _table_font()
+    header_f = QFont(f)
+    header_f.setBold(True)
+    metrics = QFontMetricsF(f)
 
     y = rect.top() + _PAD / 2
     for r_index, row in enumerate(rows):
@@ -318,9 +358,11 @@ def _paint_table(painter: QPainter, spec: PreviewSpec, rect: QRectF) -> None:
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawRect(QRectF(rect.left(), y, rect.width(), row_h))
             painter.setPen(QPen(_GRID, 1))
+        painter.setFont(header_f if r_index == 0 else f)
+        x = rect.left()
         for c_index in range(ncols):
-            x = rect.left() + c_index * col_w
-            painter.drawRect(QRectF(x, y, col_w, row_h))
+            width = widths[c_index]
+            painter.drawRect(QRectF(x, y, width, row_h))
             text = row[c_index]["text"] if c_index < len(row) else ""
             painter.setPen(_TEXT)
             align = Qt.AlignmentFlag.AlignLeft
@@ -328,12 +370,16 @@ def _paint_table(painter: QPainter, spec: PreviewSpec, rect: QRectF) -> None:
                 align = Qt.AlignmentFlag.AlignHCenter
             elif c_index < len(row) and row[c_index]["align"] == "right":
                 align = Qt.AlignmentFlag.AlignRight
+            inner = max(0.0, width - _CELL_PAD * 2)
+            shown = metrics.elidedText(
+                text, Qt.TextElideMode.ElideRight, int(inner))
             painter.drawText(
-                QRectF(x + 4, y, col_w - 8, row_h),
+                QRectF(x + _CELL_PAD, y, inner, row_h),
                 int(align | Qt.AlignmentFlag.AlignVCenter),
-                text,
+                shown,
             )
             painter.setPen(QPen(_GRID, 1))
+            x += width
         y += row_h
         if y > rect.bottom():
             break
