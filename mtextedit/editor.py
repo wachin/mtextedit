@@ -17,6 +17,7 @@ embedded in any PyQt6 project (e.g. the fourth panel of an e-Sword-like tool).
 from __future__ import annotations
 
 import os
+import re
 from typing import List, Optional
 
 from PyQt6.QtCore import QRectF, Qt, QTimer, pyqtSignal
@@ -105,6 +106,26 @@ class MTextEdit(QTextEdit):
         if control and shift and key == Qt.Key.Key_X:
             self._toggle_inline("~~")
             return
+        headings = {
+            Qt.Key.Key_1: 1, Qt.Key.Key_2: 2, Qt.Key.Key_3: 3,
+            Qt.Key.Key_4: 4, Qt.Key.Key_5: 5, Qt.Key.Key_6: 6,
+        }
+        if control and not shift and key in headings:
+            self._toggle_heading(headings[key])
+            return
+        if control and shift:
+            if key == Qt.Key.Key_7:
+                self._toggle_line("1. ", r"^\d+[.)]\s+")
+                return
+            if key == Qt.Key.Key_8:
+                self._toggle_line("- ", r"^[-*+]\s+")
+                return
+            if key == Qt.Key.Key_9:
+                self._toggle_line("- [ ] ", r"^[-*+]\s+\[[ xX]\]\s+")
+                return
+            if key == Qt.Key.Key_Q:
+                self._toggle_line("> ", r"^>\s?")
+                return
         super().keyPressEvent(event)
 
     def _select(self, start: int, end: int) -> None:
@@ -164,6 +185,61 @@ class MTextEdit(QTextEdit):
         cursor.insertText(marker)
         cursor.endEditBlock()
         self._select(start + size, end + size)
+
+    def _selected_blocks(self) -> list:
+        cursor = self.textCursor()
+        start = cursor.selectionStart()
+        end = cursor.selectionEnd()
+        first = self.document().findBlock(start)
+        last = self.document().findBlock(max(start, end - 1))
+        blocks = []
+        block = first
+        while block.isValid():
+            blocks.append(block)
+            if block == last:
+                break
+            block = block.next()
+        return blocks
+
+    def _replace_block_text(self, cursor, block, text: str) -> None:
+        cursor.setPosition(block.position())
+        cursor.setPosition(block.position() + len(block.text()),
+                           QTextCursor.MoveMode.KeepAnchor)
+        cursor.insertText(text)
+
+    def _toggle_heading(self, level: int) -> None:
+        blocks = self._selected_blocks()
+        if not blocks:
+            return
+        current = re.match(r"^(#{1,6})\s+", blocks[0].text())
+        current_level = len(current.group(1)) if current else 0
+        target = 0 if current_level == level else level
+        cursor = QTextCursor(self.document())
+        cursor.beginEditBlock()
+        for block in blocks:
+            text = re.sub(r"^#{1,6}\s+", "", block.text())
+            prefix = ("#" * target + " ") if target else ""
+            self._replace_block_text(cursor, block, prefix + text)
+        cursor.endEditBlock()
+
+    def _toggle_line(self, prefix: str, pattern: str) -> None:
+        blocks = self._selected_blocks()
+        if not blocks:
+            return
+        remove = all(re.match(pattern, block.text()) for block in blocks)
+        cursor = QTextCursor(self.document())
+        cursor.beginEditBlock()
+        for block in blocks:
+            text = block.text()
+            if remove:
+                text = re.sub(pattern, "", text, count=1)
+            else:
+                text = re.sub(
+                    r"^(?:>\s*|(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?)",
+                    "", text, count=1)
+                text = prefix + text
+            self._replace_block_text(cursor, block, text)
+        cursor.endEditBlock()
 
     def _insert_link(self) -> None:
         cursor = self.textCursor()

@@ -146,9 +146,15 @@ Both `examples/demo.py` and `marktux/main.py` expose these under a **Tools** men
 | `Ctrl+K` | link (`[text]()`, caret inside the destination) |
 | `Ctrl+Backtick` | inline code (`` `text` ``) |
 | `Ctrl+Shift+X` | strikethrough (`~~text~~`) |
+| `Ctrl+1` … `Ctrl+6` | heading level (press again to remove) |
+| `Ctrl+Shift+7` | ordered list |
+| `Ctrl+Shift+8` | unordered list |
+| `Ctrl+Shift+9` | task list (`- [ ]`) |
+| `Ctrl+Shift+Q` | blockquote |
 
-Each shortcut wraps or unwraps the selection, and works on an empty caret by
-inserting the pair and placing the cursor inside it.
+Inline shortcuts wrap or unwrap the selection, and work on an empty caret by
+inserting the pair and placing the cursor inside it. Block shortcuts apply to
+every selected line and toggle the prefix off when all lines already have it.
 
 ## Images
 

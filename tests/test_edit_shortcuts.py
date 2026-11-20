@@ -94,6 +94,42 @@ class EditShortcutTest(unittest.TestCase):
         QTest.keyClicks(editor, "hello")
         self.assertEqual(editor.toPlainText(), "hello")
 
+    def test_heading_levels_toggle(self):
+        editor = self._editor("Title")
+        QTest.keyClick(editor, Qt.Key.Key_1, Qt.KeyboardModifier.ControlModifier)
+        self.assertEqual(editor.toPlainText(), "# Title")
+        QTest.keyClick(editor, Qt.Key.Key_2, Qt.KeyboardModifier.ControlModifier)
+        self.assertEqual(editor.toPlainText(), "## Title")
+        QTest.keyClick(editor, Qt.Key.Key_2, Qt.KeyboardModifier.ControlModifier)
+        self.assertEqual(editor.toPlainText(), "Title")
+
+    def test_unordered_list_over_a_selection(self):
+        editor = self._editor("one\ntwo")
+        self._select(editor, 0, len(editor.toPlainText()))
+        QTest.keyClick(editor, Qt.Key.Key_8, Qt.KeyboardModifier.ControlModifier
+                       | Qt.KeyboardModifier.ShiftModifier)
+        self.assertEqual(editor.toPlainText(), "- one\n- two")
+        QTest.keyClick(editor, Qt.Key.Key_8, Qt.KeyboardModifier.ControlModifier
+                       | Qt.KeyboardModifier.ShiftModifier)
+        self.assertEqual(editor.toPlainText(), "one\ntwo")
+
+    def test_quote_and_task_list(self):
+        editor = self._editor("note")
+        QTest.keyClick(editor, Qt.Key.Key_Q, Qt.KeyboardModifier.ControlModifier
+                       | Qt.KeyboardModifier.ShiftModifier)
+        self.assertEqual(editor.toPlainText(), "> note")
+
+        editor = self._editor("todo")
+        QTest.keyClick(editor, Qt.Key.Key_9, Qt.KeyboardModifier.ControlModifier
+                       | Qt.KeyboardModifier.ShiftModifier)
+        self.assertEqual(editor.toPlainText(), "- [ ] todo")
+
+    def test_ordered_list(self):
+        editor = self._editor("first")
+        QTest.keyClick(editor, Qt.Key.Key_7, Qt.KeyboardModifier.ControlModifier
+                       | Qt.KeyboardModifier.ShiftModifier)
+        self.assertEqual(editor.toPlainText(), "1. first")
+
 
 if __name__ == "__main__":
     unittest.main()
