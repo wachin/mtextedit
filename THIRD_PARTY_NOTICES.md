@@ -5,7 +5,7 @@ the third-party work it builds on or depends on.
 
 ## Compiled and runtime dependencies
 
-* **cmark** — `libs/cmarkgfm/third_party/cmark`: our fork (`wachin/cmark`) of
+* **cmark** — `libs/cmarkgfm/libs/cmark`: our fork (`wachin/cmark`) of
   VNote's cmark fork. BSD-2-Clause, Copyright (c) 2014 John MacFarlane. The
   `COPYING` file ships inside that submodule; `MAINTENANCE.md` in cmarkgfm
   documents how upstream changes are reviewed.

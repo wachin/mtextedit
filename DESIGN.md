@@ -276,7 +276,7 @@ or C++ toolchain is needed to keep or extend it.
 ## D15. VNote's cmark is the parser; parsing yields a small IR
 
 **Decision.** `mtextedit.mdparse` parses the document with VNote's cmark fork
-(`libs/cmarkgfm`, whose `third_party/cmark` is our fork of `vnotex/cmark`
+(`libs/cmarkgfm`, whose `libs/cmark` is our fork of `vnotex/cmark`
 0.31.2, `wachin/cmark`) into a Qt-free IR: block
 ranges plus inline spans in absolute character offsets. Inline spans come from
 the parser's own source metadata (`CMARK_OPT_SOURCE_SYNTAX`), including the
