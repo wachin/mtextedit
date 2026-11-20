@@ -318,10 +318,32 @@ strong/emphasis/code/link/strike/mark get its colours. VNote is LGPL-3.0 and
 `themes/README.md` and `THIRD_PARTY_NOTICES.md`), while the loader is our code.
 
 **Consequences.** The editor now looks like VNote for the constructs the
-highlighter styles. Inline emphasis is still matched with regexes; exact cmark
-spans and cursor-aware marker concealment are the next step. A host that does
-not want the VNote look can pass its own `Theme` to `MarkdownHighlighter` or
-call `set_theme()` at runtime.
+highlighter styles. Inline styling uses exact cmark spans and markers dim off
+the cursor line (D17); a host that does not want the VNote look can pass its
+own `Theme` to `MarkdownHighlighter` or call `set_theme()` at runtime.
+
+## D17. Exact cmark spans drive inline styling; markers dim off the cursor line
+
+**Decision.** The render worker gets tokens *and* exact inline spans from one
+cmark parse (`mdparse.parse_document`). `MarkdownHighlighter.set_spans()`
+replaces the regex inline styling: strong, emphasis, inline code, links, images,
+strikethrough, mark and inline math are applied at the parser's own offsets.
+Regexes remain only as a fallback until the first render arrives. Markers are
+styled normally on the cursor's line and dimmed with the theme's text colour at
+30% alpha elsewhere.
+
+**Why.** Regexes mis-style nested emphasis, escaped markers, code with inner
+backticks and destinations containing parentheses; cmark already computes exact
+extents and delimiter spans. Dimming markers keeps the source readable while
+signalling structure, without hiding characters.
+
+**Consequences.** Width-collapsing concealment -- VNote hides markers entirely
+through a custom document layout -- is **not** implemented: Qt's
+`QSyntaxHighlighter` can style text but cannot remove its advance. That remains a
+separate, larger decision (custom layout, or marker dimming as the accepted
+behaviour). Cursor movement rehighlights only the previous and current blocks.
+
+---
 
 ## Non-goals
 

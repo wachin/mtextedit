@@ -43,6 +43,8 @@ layout. Toggle it from the **View → In-place Preview** menu.
 Fenced code is painted token by token with Pygments runs computed on the render
 worker, and tables size their columns from their content (bold headers,
 ellipsis for cells that still do not fit) instead of splitting the band evenly.
+Inline styling uses cmark's exact source spans (not regexes), and syntax markers
+are dimmed on lines that do not hold the cursor.
 
 The full decision record (why a single pane, why `QTextEdit`, why block margins
 instead of a custom layout, preview scope and limitations) is in

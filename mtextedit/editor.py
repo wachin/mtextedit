@@ -34,6 +34,7 @@ class MTextEdit(QTextEdit):
     def __init__(self, parent=None, render_delay_ms: int = 120):
         super().__init__(parent)
         self._highlighter = MarkdownHighlighter(self.document())
+        self.cursorPositionChanged.connect(self._sync_cursor_line)
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
         self._timer.setInterval(render_delay_ms)
@@ -120,6 +121,9 @@ class MTextEdit(QTextEdit):
 
     def current_line(self) -> int:
         return self.textCursor().blockNumber()
+
+    def _sync_cursor_line(self):
+        self._highlighter.set_cursor_line(self.textCursor().blockNumber())
 
     # -- in-place preview ----------------------------------------------------
     def set_inplace_preview_enabled(self, enabled: bool):

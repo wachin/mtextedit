@@ -62,6 +62,9 @@ class MarkdownHighlighter(QSyntaxHighlighter):
                  theme: Theme | None = None):
         super().__init__(document)
         self._regions: list[dict] = []
+        self._spans: list = []
+        self._spans_ready = False
+        self._cursor_line = -1
         self._theme = theme if theme is not None else load_default()
         self._setup_formats()
         self._setup_inline_patterns()
@@ -103,6 +106,14 @@ class MarkdownHighlighter(QSyntaxHighlighter):
         self.f_image = _char_format(theme.syntax_style("IMAGE"))
         self.f_strike = _char_format(theme.syntax_style("STRIKE"), strike=True)
         self.f_mark = _char_format(theme.syntax_style("MARK"))
+        self.f_math = _char_format(theme.syntax_style("INLINEEQUATION"))
+
+        # Markers on lines without the cursor are dimmed rather than styled.
+        base = theme.editor_style("Text")
+        marker_color = QColor(base.color or "#222222")
+        marker_color.setAlpha(70)
+        self.f_marker = QTextCharFormat()
+        self.f_marker.setForeground(marker_color)
 
     def _setup_inline_patterns(self) -> None:
         self._inline_patterns = [
@@ -119,23 +130,80 @@ class MarkdownHighlighter(QSyntaxHighlighter):
 
     # -- manager wiring ------------------------------------------------------
     def set_manager(self, manager):
-        """Connect to a RenderManager to receive block regions."""
+        """Connect to a RenderManager to receive regions and exact spans."""
         manager.structureAvailable.connect(self.set_regions)
+        if hasattr(manager, "spansAvailable"):
+            manager.spansAvailable.connect(self.set_spans)
 
     def set_regions(self, regions: list[dict]):
         self._regions = regions or []
         self.rehighlight()
 
     # -- highlighting --------------------------------------------------------
-    def highlightBlock(self, text: str) -> None:
-        line = self.currentBlock().blockNumber()
+    def set_spans(self, spans: list) -> None:
+        """Receive exact inline spans (absolute character offsets)."""
+        self._spans = list(spans or [])
+        self._spans_ready = True
+        self.rehighlight()
 
-        # Inline emphasis (cheap, per visible block).
-        for pattern, fmt in self._inline_patterns:
-            it = pattern.globalMatch(text)
-            while it.hasNext():
-                match = it.next()
-                self.setFormat(match.capturedStart(), match.capturedLength(), fmt)
+    def set_cursor_line(self, line: int) -> None:
+        """Markers stay visible on the cursor's line and dim elsewhere."""
+        if line == self._cursor_line:
+            return
+        previous, self._cursor_line = self._cursor_line, line
+        document = self.document()
+        for number in {previous, line}:
+            if 0 <= number < document.blockCount():
+                self.rehighlightBlock(document.findBlockByNumber(number))
+
+    def _format_for(self, style: str):
+        return {
+            "strong": self.f_strong,
+            "emph": self.f_emph,
+            "code": self.f_inline_code,
+            "link": self.f_link,
+            "image": self.f_image,
+            "strike": self.f_strike,
+            "mark": self.f_mark,
+            "math": self.f_math,
+        }.get(style)
+
+    def _highlight_spans(self, text: str, line: int, block_start: int,
+                         block_end: int) -> None:
+        for span in self._spans:
+            if span.end <= block_start or span.start >= block_end:
+                continue
+            start = max(span.start, block_start) - block_start
+            end = min(span.end, block_end) - block_start
+            fmt = self._format_for(span.style)
+            if fmt is not None and end > start:
+                self.setFormat(start, end - start, fmt)
+            if line == self._cursor_line:
+                continue
+            content_start = max(start, min(span.content_start, block_end)
+                                - block_start)
+            content_end = max(start, min(span.content_end, block_end)
+                              - block_start)
+            if content_start > start:
+                self.setFormat(start, content_start - start, self.f_marker)
+            if end > content_end:
+                self.setFormat(content_end, end - content_end, self.f_marker)
+
+    def highlightBlock(self, text: str) -> None:
+        block = self.currentBlock()
+        line = block.blockNumber()
+        block_start = block.position()
+        block_end = block_start + len(text)
+
+        if self._spans_ready:
+            self._highlight_spans(text, line, block_start, block_end)
+        else:
+            # Fallback until the first render delivers spans.
+            for pattern, fmt in self._inline_patterns:
+                it = pattern.globalMatch(text)
+                while it.hasNext():
+                    match = it.next()
+                    self.setFormat(match.capturedStart(), match.capturedLength(), fmt)
 
         # Block structure from the async pipeline.
         for region in self._regions:

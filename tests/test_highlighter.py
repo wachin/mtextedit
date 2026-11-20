@@ -21,6 +21,7 @@ if str(_ROOT) not in sys.path:
 from PyQt6.QtGui import QFont, QTextDocument
 from PyQt6.QtWidgets import QApplication
 
+from mtextedit import mdparse
 from mtextedit.highlighter import MarkdownHighlighter
 from mtextedit.theme import Theme, load_default
 
@@ -43,10 +44,11 @@ class HighlighterThemeTest(unittest.TestCase):
     def _format_at(block, needle: str):
         """Char format the highlighter applied at ``needle``'s position."""
         position = block.text().index(needle)
+        found = None
         for entry in block.layout().formats():
             if entry.start <= position < entry.start + entry.length:
-                return entry.format
-        return None
+                found = entry.format
+        return found
 
     def test_bundled_theme_is_vnotes_native(self):
         theme = load_default()
@@ -112,6 +114,61 @@ class HighlighterThemeTest(unittest.TestCase):
         fmt = self._format_at(doc.findBlockByNumber(1), "x = 1")
         self.assertIsNotNone(fmt)
         self.assertEqual(fmt.foreground().color().name(), "#673ab7")
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+
+class SpanHighlightTest(unittest.TestCase):
+    """Exact cmark spans replace the regex fallback once a render arrives."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    def _document(self, text: str):
+        doc = QTextDocument()
+        highlighter = MarkdownHighlighter(doc)
+        doc.setPlainText(text)
+        highlighter.set_spans(mdparse.parse_document(text).spans)
+        return doc, highlighter
+
+    @staticmethod
+    def _format(doc, needle: str):
+        return HighlighterThemeTest._format_at(doc.firstBlock(), needle)
+
+    def test_nested_emphasis_uses_exact_spans(self):
+        doc, _ = self._document("**bold *it***")
+        self.assertEqual(self._format(doc, "bold").fontWeight(), QFont.Weight.Bold)
+        self.assertTrue(self._format(doc, "it").fontItalic())
+
+    def test_escaped_markers_are_not_emphasis(self):
+        # cmark reports no emphasis span; with spans ready the regex fallback
+        # must not run and italicise the escaped markers.
+        doc, _ = self._document(r"\*plain\*")
+        self.assertIsNone(self._format(doc, "plain"))
+
+    def test_code_span_with_inner_backtick(self):
+        doc, _ = self._document("``a`b``")
+        fmt = self._format(doc, "a`b")
+        self.assertEqual(fmt.foreground().color().name(), "#8e24aa")
+
+    def test_link_with_parentheses_in_destination(self):
+        doc, _ = self._document("[x](https://e.test/a_(b))")
+        fmt = self._format(doc, "x")
+        self.assertEqual(fmt.foreground().color().name(), "#005fff")
+
+    def test_markers_dim_off_the_cursor_line(self):
+        doc, highlighter = self._document("**bold**")
+        # Spans arrive with cursor line -1: markers are dimmed.
+        marker = self._format(doc, "**")
+        self.assertEqual(marker.foreground().color().alpha(), 70)
+
+        highlighter.set_cursor_line(0)
+        marker = self._format(doc, "**")
+        self.assertEqual(marker.foreground().color().alpha(), 255)
+        self.assertEqual(self._format(doc, "bold").fontWeight(), QFont.Weight.Bold)
 
 
 if __name__ == "__main__":

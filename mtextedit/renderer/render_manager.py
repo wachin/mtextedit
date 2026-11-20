@@ -44,6 +44,7 @@ class RenderManager(QObject):
     headingsAvailable = pyqtSignal(list)               # headings
     structureAvailable = pyqtSignal(list)              # regions
     tokensAvailable = pyqtSignal(list)                 # parsed token stream (in-place preview)
+    spansAvailable = pyqtSignal(list)                  # exact inline spans (highlighter)
     previewImagesAvailable = pyqtSignal(dict)          # {abs_path: QImage}
 
     def __init__(self, parent: QObject = None, render_delay_ms: int = 120,
@@ -100,7 +101,8 @@ class RenderManager(QObject):
         worker.signals.done.connect(self._on_done)
         self._pool.start(worker)
 
-    def _on_done(self, rev, html, headings, tokens, regions, new_images, requests):
+    def _on_done(self, rev, html, headings, tokens, regions, new_images, requests,
+                 spans):
         if rev != self._gen[0]:           # superseded by a newer request
             return
 
@@ -127,6 +129,7 @@ class RenderManager(QObject):
         self.headingsAvailable.emit(headings)
         self.structureAvailable.emit(regions)
         self.tokensAvailable.emit(tokens)
+        self.spansAvailable.emit(spans)
         self.rendered.emit(rev, html, headings, tokens, regions)
 
     def force_render(self, source: str):

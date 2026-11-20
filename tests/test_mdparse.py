@@ -99,6 +99,21 @@ class CmarkIRTest(unittest.TestCase):
         self.assertLess(span.start, span.end)
 
 
+class ParsedDocumentTest(unittest.TestCase):
+    def test_tokens_and_spans_come_from_one_parse(self):
+        source = "a **b** and `c` and ~~d~~\n"
+        parsed = mdparse.parse_document(source)
+        self.assertTrue(parsed.tokens)
+        styles = {span.style for span in parsed.spans}
+        self.assertTrue({"strong", "code", "strike"} <= styles)
+
+        ir = mdparse.parse(source)
+        self.assertEqual(
+            [(span.style, span.start, span.end) for span in parsed.spans],
+            [(span.style, span.start, span.end) for span in ir.spans],
+        )
+
+
 class RequiredBackendTest(unittest.TestCase):
     def test_parse_requires_vnotes_cmark(self):
         with mock.patch.object(mdparse, "cmark_backend", lambda: None):

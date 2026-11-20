@@ -25,7 +25,7 @@ from PyQt6.QtGui import QImage
 
 class _RenderSignals(QObject):
     # rev, html, headings, tokens, regions, new_images, image_requests
-    done = pyqtSignal(int, str, list, list, list, dict, list)
+    done = pyqtSignal(int, str, list, list, list, dict, list, list)
 
 
 class RenderWorker(QRunnable):
@@ -50,8 +50,9 @@ class RenderWorker(QRunnable):
 
     def run(self):
         # Cheap first phase: parse + headings/regions (outline shows immediately).
-        from ..mdparse import parse_tokens
-        tokens = parse_tokens(self.source)
+        from ..mdparse import parse_document
+        parsed = parse_document(self.source)
+        tokens = parsed.tokens
 
         from .._markdown import extract_headings, collect_block_regions
         headings = extract_headings(tokens)
@@ -87,5 +88,6 @@ class RenderWorker(QRunnable):
         # tokens/images are plain Python/Qt value objects; safe to pass by
         # reference across the queued signal.
         self.signals.done.emit(
-            self.revision, html, headings, tokens, regions, new_images, requests
+            self.revision, html, headings, tokens, regions, new_images, requests,
+            parsed.spans
         )

@@ -277,7 +277,25 @@ def _plain_text(node) -> str:
     return "".join(parts)
 
 
-def _inline_tokens(container) -> list[Token]:
+@dataclass
+class ParsedDocument:
+    """Tokens for the editor plus the exact spans for the highlighter."""
+
+    tokens: list[Token]
+    spans: list[Span]
+
+
+def _collect_span(node, source_map: SourceMap, spans: list[Span]) -> None:
+    style = INLINE_STYLES.get(node.type_name)
+    if style is None:
+        return
+    span = _span_from_node(node, source_map, style)
+    if span is not None:
+        spans.append(span)
+
+
+def _inline_tokens(container, source_map: SourceMap,
+                   spans: list[Span]) -> list[Token]:
     tokens: list[Token] = []
     for node in container.children():
         name = node.type_name
@@ -288,23 +306,27 @@ def _inline_tokens(container) -> list[Token]:
         elif name == "linebreak":
             tokens.append(Token("hardbreak"))
         elif name == "code":
+            _collect_span(node, source_map, spans)
             tokens.append(Token("code_inline", content=node.literal))
         elif name in ("strong", "emph", "strikethrough", "mark"):
+            _collect_span(node, source_map, spans)
             open_type = {"strong": "strong_open", "emph": "em_open",
                          "strikethrough": "s_open", "mark": "mark_open"}[name]
             close_type = {"strong": "strong_close", "emph": "em_close",
                           "strikethrough": "s_close", "mark": "mark_close"}[name]
             tokens.append(Token(open_type))
-            tokens.extend(_inline_tokens(node))
+            tokens.extend(_inline_tokens(node, source_map, spans))
             tokens.append(Token(close_type))
         elif name in ("link", "wikilink"):
+            _collect_span(node, source_map, spans)
             tokens.append(Token("link_open", attrs=[
                 ("href", node.url or node.literal),
                 ("title", node.title),
             ]))
-            tokens.extend(_inline_tokens(node))
+            tokens.extend(_inline_tokens(node, source_map, spans))
             tokens.append(Token("link_close"))
         elif name == "image":
+            _collect_span(node, source_map, spans)
             alt = _plain_text(node)
             tokens.append(Token("image", content=alt, attrs=[
                 ("src", node.url), ("alt", alt), ("title", node.title),
@@ -312,17 +334,19 @@ def _inline_tokens(container) -> list[Token]:
         elif name == "html_inline":
             tokens.append(Token("html_inline", content=node.literal))
         elif name == "formula_inline":
+            _collect_span(node, source_map, spans)
             tokens.append(Token("math_inline", content=node.literal))
         elif name == "footnote_reference":
             tokens.append(Token("footnote_ref", content=node.literal))
         else:
-            tokens.extend(_inline_tokens(node))
+            tokens.extend(_inline_tokens(node, source_map, spans))
     return tokens
 
 
-def _inline(container) -> Token:
+def _inline(container, source_map: SourceMap, spans: list[Span]) -> Token:
     return Token("inline", content=_plain_text(container),
-                 children=_inline_tokens(container), map=_line_map(container))
+                 children=_inline_tokens(container, source_map, spans),
+                 map=_line_map(container))
 
 
 def _table_aligns(source_lines: list[str], table_line: int, ncols: int) -> list[str]:
@@ -338,7 +362,8 @@ def _table_aligns(source_lines: list[str], table_line: int, ncols: int) -> list[
     return aligns
 
 
-def _table_tokens(node, source_lines: list[str]) -> list[Token]:
+def _table_tokens(node, source_lines: list[str], source_map: SourceMap,
+                  spans: list[Span]) -> list[Token]:
     tokens: list[Token] = [Token("table_open", map=_line_map(node))]
     rows = list(node.children())
     ncols = max((len(list(row.children())) for row in rows), default=0)
@@ -353,7 +378,7 @@ def _table_tokens(node, source_lines: list[str]) -> list[Token]:
             align = aligns[column] if column < len(aligns) else "left"
             cell_type = "th_open" if is_header else "td_open"
             tokens.append(Token(cell_type, attrs=[("style", f"text-align:{align}")]))
-            tokens.append(_inline(cell))
+            tokens.append(_inline(cell, source_map, spans))
             tokens.append(Token("th_close" if is_header else "td_close"))
         tokens.append(Token("tr_close"))
         body_index += 1
@@ -376,21 +401,22 @@ def _code_token(node) -> Token:
     return token
 
 
-def _block_tokens(node, source_lines: list[str]) -> list[Token]:
+def _block_tokens(node, source_lines: list[str], source_map: SourceMap,
+                  spans: list[Span]) -> list[Token]:
     name = node.type_name
     if name == "paragraph":
-        return [Token("paragraph_open", map=_line_map(node)), _inline(node),
-                Token("paragraph_close")]
+        return [Token("paragraph_open", map=_line_map(node)),
+                _inline(node, source_map, spans), Token("paragraph_close")]
     if name == "heading":
         level = node.heading_level
         return [Token("heading_open", tag=f"h{level}", map=_line_map(node)),
-                _inline(node), Token("heading_close")]
+                _inline(node, source_map, spans), Token("heading_close")]
     if name == "code_block":
         return [_code_token(node)]
     if name == "block_quote":
         tokens = [Token("blockquote_open", map=_line_map(node))]
         for child in node.children():
-            tokens.extend(_block_tokens(child, source_lines))
+            tokens.extend(_block_tokens(child, source_lines, source_map, spans))
         tokens.append(Token("blockquote_close"))
         return tokens
     if name == "list":
@@ -399,17 +425,17 @@ def _block_tokens(node, source_lines: list[str]) -> list[Token]:
         close_type = "ordered_list_close" if ordered else "bullet_list_close"
         tokens = [Token(open_type, map=_line_map(node))]
         for child in node.children():
-            tokens.extend(_block_tokens(child, source_lines))
+            tokens.extend(_block_tokens(child, source_lines, source_map, spans))
         tokens.append(Token(close_type))
         return tokens
     if name == "item":
         tokens = [Token("list_item_open", map=_line_map(node))]
         for child in node.children():
-            tokens.extend(_block_tokens(child, source_lines))
+            tokens.extend(_block_tokens(child, source_lines, source_map, spans))
         tokens.append(Token("list_item_close"))
         return tokens
     if name == "table":
-        return _table_tokens(node, source_lines)
+        return _table_tokens(node, source_lines, source_map, spans)
     if name == "thematic_break":
         return [Token("hr", map=_line_map(node))]
     if name == "html_block":
@@ -421,18 +447,26 @@ def _block_tokens(node, source_lines: list[str]) -> list[Token]:
     return []
 
 
-def parse_tokens(text: str) -> list[Token]:
-    """Parse ``text`` into the compact token stream the editor consumes."""
+def parse_document(text: str) -> ParsedDocument:
+    """Parse once into the editor token stream and the highlighter spans."""
     cmark = require_cmark()
     document = cmark.parse_document(text, cmark.Options.CMARK_OPT_HIGHLIGHT)
     source_lines = text.split("\n")
+    source_map = SourceMap(text)
     tokens: list[Token] = []
+    spans: list[Span] = []
     try:
         for child in document.children():
-            tokens.extend(_block_tokens(child, source_lines))
+            tokens.extend(_block_tokens(child, source_lines, source_map, spans))
     finally:
         document.close()
-    return tokens
+    spans.sort(key=lambda span: (span.start, -span.end))
+    return ParsedDocument(tokens, spans)
+
+
+def parse_tokens(text: str) -> list[Token]:
+    """Tokens only (kept for callers that do not need the spans)."""
+    return parse_document(text).tokens
 
 
 def render_html(text: str, options: int = 0) -> str:
