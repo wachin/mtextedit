@@ -63,6 +63,12 @@ class ImageDialogTest(unittest.TestCase):
         editor.insertFromMimeData(mime)
         self.assertEqual(editor.toPlainText(), "")
 
+    def test_dialog_exposes_accessible_names(self):
+        dialog = ImageInsertDialog(QImage(4, 4, QImage.Format.Format_RGB32))
+        self.assertEqual(dialog.accessibleName(), "Insert image")
+        self.assertEqual(dialog._alt.accessibleName(), "Alternative text")
+        self.assertEqual(dialog._title.accessibleName(), "Title")
+
 
 if __name__ == "__main__":
     unittest.main()

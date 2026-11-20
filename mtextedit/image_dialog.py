@@ -37,10 +37,14 @@ class ImageInsertDialog(QDialog):
     def __init__(self, image: QImage, suggested_alt: str = "", parent=None):
         super().__init__(parent)
         self.setWindowTitle("Insert Image")
+        self.setAccessibleName("Insert image")
         self._alt = QLineEdit(suggested_alt)
+        self._alt.setAccessibleName("Alternative text")
         self._title = QLineEdit()
+        self._title.setAccessibleName("Title")
 
         preview = QLabel()
+        preview.setAccessibleName("Image preview")
         preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
         pixmap = QPixmap.fromImage(image)
         if not pixmap.isNull():
