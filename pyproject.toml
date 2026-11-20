@@ -18,6 +18,7 @@ dependencies = [
 [project.optional-dependencies]
 webengine = ["PyQt6-QtWebEngine>=6.4"]
 linguistic = ["pyqt6-linguistic-tools"]
+math = ["matplotlib>=3.8"]
 
 [tool.setuptools.packages.find]
 include = ["mtextedit*"]

@@ -13,7 +13,9 @@ them.
 
 from __future__ import annotations
 
+import io
 import os
+import tempfile
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
@@ -22,6 +24,7 @@ from PyQt6.QtGui import (
     QColor,
     QFont,
     QFontMetricsF,
+    QImage,
     QPainter,
     QPen,
     QPixmap,
@@ -48,9 +51,10 @@ _TEXT = QColor("#24292f")
 @dataclass
 class PreviewSpec:
     block: int                 # 0-based source line / QTextBlock number
-    kind: str                  # "code" | "table" | "image"
+    kind: str                  # "code" | "table" | "image" | "math"
     height: float = 0.0
     data: Dict[str, Any] = field(default_factory=dict)
+    end_block: int = -1        # last source block covered by the preview
 
 
 # ---------------------------------------------------------------------------
@@ -69,7 +73,8 @@ def build_specs(tokens: List[Any], base_path: Optional[str] = None) -> List[Prev
             lang = ""
             if ty == "fence" and tok.info:
                 lang = tok.info.strip().split()[0]
-            specs.append(PreviewSpec(block=line, kind="code",
+            end = tok.map[1] - 1 if tok.map else line
+            specs.append(PreviewSpec(block=line, end_block=end, kind="code",
                                      data={"lang": lang, "code": tok.content,
                                            "highlight": tok.meta.get("highlight")}))
             i += 1
@@ -77,23 +82,63 @@ def build_specs(tokens: List[Any], base_path: Optional[str] = None) -> List[Prev
             line = tok.map[0] if tok.map else 0
             rows, end = _parse_table(tokens, i)
             if rows:
-                specs.append(PreviewSpec(block=line, kind="table",
-                                         data={"rows": rows}))
+                specs.append(PreviewSpec(block=line, end_block=line + len(rows),
+                                         kind="table", data={"rows": rows}))
             i = end + 1
+        elif ty == "formula_block":
+            line = tok.map[0] if tok.map else 0
+            end = tok.map[1] - 1 if tok.map else line
+            specs.append(PreviewSpec(block=line, end_block=end, kind="math",
+                                     data={"tex": tok.content.strip()}))
+            i += 1
         elif ty == "paragraph_open":
             inline = tokens[i + 1] if i + 1 < n else None
             imgs = _paragraph_images(inline)
             if imgs:
                 line = tok.map[0] if tok.map else 0
                 for src, alt in imgs:
+                    end = tok.map[1] - 1 if tok.map else line
                     specs.append(PreviewSpec(
-                        block=line, kind="image",
+                        block=line, end_block=end, kind="image",
                         data={"src": src, "alt": alt, "base": base_path,
                               "abs_path": _resolve_image_path(src, base_path)}))
             i += 3
         else:
             i += 1
     return specs
+
+
+_MATH_CACHE: Dict[str, Any] = {}
+
+
+def _math_pixmap(tex: str) -> Optional[QPixmap]:
+    """Render one TeX formula with matplotlib, or return None if unavailable."""
+    if tex in _MATH_CACHE:
+        return _MATH_CACHE[tex]
+    if "MPLCONFIGDIR" not in os.environ:
+        cache_dir = os.path.join(tempfile.gettempdir(), "mtextedit-matplotlib")
+        try:
+            os.makedirs(cache_dir, exist_ok=True)
+            os.environ["MPLCONFIGDIR"] = cache_dir
+        except OSError:
+            pass
+    try:
+        import matplotlib
+
+        matplotlib.use("Agg", force=True)
+        from matplotlib import mathtext
+
+        buffer = io.BytesIO()
+        mathtext.math_to_image(f"${tex.strip().strip('$')}$", buffer,
+                               dpi=160, format="png", color=CODE_TEXT)
+        image = QImage.fromData(buffer.getvalue(), "PNG")
+        if image.isNull():
+            return None
+        pixmap = QPixmap.fromImage(image)
+    except Exception:  # noqa: BLE001 - optional dependency or bad TeX
+        pixmap = None
+    _MATH_CACHE[tex] = pixmap
+    return pixmap
 
 
 def image_requests(tokens: List[Any], base_path: Optional[str] = None) -> List[tuple]:
@@ -231,6 +276,12 @@ def measure_specs(
             spec.data["col_widths"] = column_widths(
                 rows, max(1.0, available_width - 2),
                 QFontMetricsF(_table_font()))
+        elif spec.kind == "math":
+            pix = _math_pixmap(spec.data.get("tex", ""))
+            if pix is None or pix.isNull():
+                continue
+            spec.data["pixmap"] = pix
+            spec.height = min(float(pix.height()), _MAX_H)
         elif spec.kind == "image":
             pix = _image_pixmap(spec, image_provider)
             if pix is None or pix.isNull():
@@ -283,7 +334,16 @@ def paint_spec(painter: QPainter, spec: PreviewSpec, rect: QRectF) -> None:
         _paint_table(painter, spec, rect)
     elif spec.kind == "image":
         _paint_image(painter, spec, rect)
+    elif spec.kind == "math":
+        _paint_math(painter, spec, rect)
     painter.restore()
+
+
+def _paint_math(painter: QPainter, spec: PreviewSpec, rect: QRectF) -> None:
+    pix = spec.data.get("pixmap")
+    if pix is None or pix.isNull():
+        return
+    painter.drawPixmap(int(rect.left() + 8), int(rect.top() + 4), pix)
 
 
 def _paint_code(painter: QPainter, spec: PreviewSpec, rect: QRectF) -> None:

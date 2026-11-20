@@ -271,6 +271,12 @@ class MTextEdit(QTextEdit):
         self._apply_specs(specs)
 
     def _apply_specs(self, specs: List[inplace.PreviewSpec]):
+        if self._custom_layout is not None:
+            self._specs = specs
+            self._custom_layout.set_previews(
+                specs, max(200, self.viewport().width() - 16))
+            self.viewport().update()
+            return
         # Setting a block format fires textChanged; suppress the render loop.
         self._applying = True
         try:
@@ -306,9 +312,13 @@ class MTextEdit(QTextEdit):
             self._specs = inplace.measure_specs(
                 self._specs, available, self._image_lookup
             )
+            if self._custom_layout is not None:
+                self._custom_layout.set_previews(self._specs, available)
 
     def paintEvent(self, event):
         super().paintEvent(event)
+        if self._custom_layout is not None:
+            return  # the layout paints the embedded previews
         if not self._inplace_enabled or not self._specs:
             return
         painter = QPainter(self.viewport())

@@ -165,6 +165,17 @@ editor/preview pipeline: headings, tables up to 20 columns, code fences,
 images, math and task lists. `tests/fixtures/golden-document.html` is the
 exact HTML snapshot; regenerate it only for an intentional change.
 
+## Optional math
+
+Block formulas render through matplotlib when the extra is installed:
+
+```bash
+pip install -e ".[math]"
+```
+
+Without it, TeX source remains visible. Inline math is not embedded yet;
+block formulas are (D19).
+
 ## Install
 
 ```bash

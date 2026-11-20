@@ -12,6 +12,8 @@ the third-party work it builds on or depends on.
 * **cmarkgfm** — `libs/cmarkgfm`, MIT, Copyright (c) theacodes. The fork is
   `github.com/wachin/cmarkgfm`; `LICENSE.txt` ships inside it.
 * **Pygments** — BSD-2-Clause.
+* **matplotlib** (optional `[math]` extra) — Matplotlib License (PSF-based,
+  BSD-compatible). Only imported when block formulas are rendered.
 * **PyQt6 / Qt 6** — GPL-3.0 or LGPL-3.0 (Riverbank Computing / The Qt Company).
 
 ## Data

@@ -32,7 +32,7 @@ from PyQt6.QtGui import (
 from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication, QTextEdit
 
-from mtextedit import MTextEdit, mdparse
+from mtextedit import MTextEdit, inplace, mdparse
 from mtextedit._markdown import collect_block_regions
 from mtextedit.layout import MarkdownDocumentLayout, _list_level
 
@@ -248,6 +248,28 @@ class LayoutTest(unittest.TestCase):
         editor = MTextEdit()
         self.assertEqual(editor.accessibleName(), "Markdown editor")
         self.assertIn("Markdown", editor.accessibleDescription())
+
+    def test_preview_replaces_source_off_the_cursor_line(self):
+        text = "before\n\n```\ncode\n```\n\nafter\n"
+        editor = MTextEdit()
+        editor.setPlainText(text)
+        parsed = mdparse.parse_document(text)
+        layout = editor._custom_layout
+        layout.set_spans(parsed.spans)
+        layout.set_regions(collect_block_regions(parsed.tokens))
+        specs = inplace.measure_specs(inplace.build_specs(parsed.tokens), 860)
+        editor._apply_specs(specs)
+        layout._refresh()
+
+        start = specs[0].block
+        self.assertEqual(layout._blocks[start].display, "")
+        self.assertGreater(layout._blocks[start].height, 0)
+        self.assertEqual(layout._blocks[start + 1].height, 0)
+
+        editor.setTextCursor(
+            QTextCursor(editor.document().findBlockByNumber(start + 1)))
+        layout._refresh()
+        self.assertIn("code", layout._blocks[start + 1].display)
 
 
 if __name__ == "__main__":

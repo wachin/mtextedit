@@ -93,6 +93,7 @@ class _BlockLayout:
     preedit_position: int
     preedit_display_pos: int
     preedit_len: int
+    preview: object | None = None
 
     @property
     def height(self) -> float:
@@ -142,6 +143,8 @@ class MarkdownDocumentLayout(QAbstractTextDocumentLayout):
         self._spans: list = []
         self._regions: list[dict] = []
         self._cursor_block = -1
+        self._previews: list = []
+        self._preview_width = 600.0
         self._blocks: dict[int, _BlockLayout] = {}
         self._height = 0.0
         self._width = 0.0
@@ -163,12 +166,32 @@ class MarkdownDocumentLayout(QAbstractTextDocumentLayout):
         self._regions = list(regions or [])
         self._invalidate()
 
+    def set_previews(self, previews: list, width: float = 600.0) -> None:
+        self._previews = [spec for spec in (previews or [])
+                          if getattr(spec, "height", 0) > 0]
+        self._preview_width = max(200.0, width)
+        self._invalidate()
+
+    def _preview_end(self, spec) -> int:
+        end = getattr(spec, "end_block", -1)
+        return max(end, spec.block)
+
+    def _preview_for(self, number: int):
+        for spec in self._previews:
+            if spec.block <= number <= self._preview_end(spec):
+                return spec
+        return None
+
     def set_cursor_block(self, block_number: int) -> None:
         if block_number == self._cursor_block:
             return
-        previous, self._cursor_block = self._cursor_block, block_number
-        self._blocks.pop(previous, None)
-        self._blocks.pop(block_number, None)
+        previous = self._cursor_block
+        self._cursor_block = block_number
+        if self._previews:
+            self._blocks.clear()
+        else:
+            self._blocks.pop(previous, None)
+            self._blocks.pop(block_number, None)
         self._dirty = True
         self._refresh()
 
@@ -237,6 +260,8 @@ class MarkdownDocumentLayout(QAbstractTextDocumentLayout):
                 entry.text_top = top + entry.top_margin
                 top += entry.height
                 width = max(width, entry.width)
+                if entry.preview is not None:
+                    width = max(width, self._preview_width)
                 seen.add(block.blockNumber())
             block = block.next()
         for number in list(self._blocks):
@@ -285,6 +310,18 @@ class MarkdownDocumentLayout(QAbstractTextDocumentLayout):
     def _layout_block(self, block: QTextBlock) -> _BlockLayout:
         number = block.blockNumber()
         text = block.text()
+        preview = self._preview_for(number)
+        if (preview is not None
+                and not (preview.block <= self._cursor_block
+                         <= self._preview_end(preview))):
+            total = preview.height if number == preview.block else 0.0
+            empty = QTextLayout("", self.document().defaultFont())
+            empty.beginLayout()
+            empty.endLayout()
+            entry = _BlockLayout(block, 0.0, 0.0, 0.0, 0.0, total, empty,
+                                 "", [], [], text, "", -1, 0, 0, preview)
+            self._blocks[number] = entry
+            return entry
         block_layout = block.layout()
         preedit_text = (block_layout.preeditAreaText() if block_layout else "") or ""
         preedit_position = block_layout.preeditAreaPosition() if block_layout else 0
@@ -411,7 +448,9 @@ class MarkdownDocumentLayout(QAbstractTextDocumentLayout):
         if entry is None:
             return QRectF()
         margin = self._margin()
-        return QRectF(margin, entry.top, max(entry.width, 1.0), entry.height)
+        width = (self._preview_width if entry.preview is not None
+                 else max(entry.width, 1.0))
+        return QRectF(margin, entry.top, width, entry.height)
 
     def hitTest(self, point, accuracy=Qt.HitTestAccuracy.FuzzyHit) -> int:
         self._refresh()
@@ -459,8 +498,19 @@ class MarkdownDocumentLayout(QAbstractTextDocumentLayout):
         clip = context.clip if context.clip.isValid() else QRectF()
         for number, entry in sorted(self._blocks.items()):
             offset = QPointF(margin, entry.text_top)
-            rect = QRectF(offset, QSizeF(entry.width, entry.height))
+            width = (self._preview_width if entry.preview is not None
+                     else entry.width)
+            rect = QRectF(offset, QSizeF(max(width, 1.0), entry.height))
             if clip.isValid() and not clip.intersects(rect):
+                continue
+
+            if entry.preview is not None and number == entry.preview.block:
+                from . import inplace
+
+                inplace.paint_spec(
+                    painter, entry.preview,
+                    QRectF(margin, entry.top, self._preview_width,
+                           entry.height))
                 continue
 
             region = self._region_for(number)
