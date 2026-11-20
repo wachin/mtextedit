@@ -276,7 +276,8 @@ or C++ toolchain is needed to keep or extend it.
 ## D15. VNote's cmark is the parser; parsing yields a small IR
 
 **Decision.** `mtextedit.mdparse` parses the document with VNote's cmark fork
-(`libs/cmarkgfm`, pinned to `vnotex/cmark` 0.31.2) into a Qt-free IR: block
+(`libs/cmarkgfm`, whose `third_party/cmark` is our fork of `vnotex/cmark`
+0.31.2, `wachin/cmark`) into a Qt-free IR: block
 ranges plus inline spans in absolute character offsets. Inline spans come from
 the parser's own source metadata (`CMARK_OPT_SOURCE_SYNTAX`), including the
 exact delimiter positions. The binding is required: if it is missing or the build is broken,
@@ -301,6 +302,26 @@ concealment are the next consumers; until they are wired, the existing
 region/regex highlighting stays in place.
 
 ---
+
+## D16. VNote's theme format and its Native theme are the editor's look
+
+**Decision.** `mtextedit.theme` parses VNote's `.theme` JSON
+(`markdown-syntax-styles`, `markdown-editor-styles`). The bundled
+`themes/native.theme` -- VNote's **Native** theme, copied unmodified -- is the
+default, and the highlighter builds its formats from it. A host can load any
+other VNote theme with `Theme.load(path)`.
+
+**Why.** The format plus the Native theme is what makes a VNote-like look
+possible without rewriting VNote's C++ highlighter: headings get VNote's sizes,
+strong/emphasis/code/link/strike/mark get its colours. VNote is LGPL-3.0 and
+`mtextedit` is MIT; the theme file stays LGPL-3.0 with its attribution (see
+`themes/README.md` and `THIRD_PARTY_NOTICES.md`), while the loader is our code.
+
+**Consequences.** The editor now looks like VNote for the constructs the
+highlighter styles. Inline emphasis is still matched with regexes; exact cmark
+spans and cursor-aware marker concealment are the next step. A host that does
+not want the VNote look can pass its own `Theme` to `MarkdownHighlighter` or
+call `set_theme()` at runtime.
 
 ## Non-goals
 

@@ -17,6 +17,8 @@ mtextedit/
   highlighter.py     MarkdownHighlighter -- block regions (async) + inline regex
   code_style.py      GitHubLightStyle -- Pygments palette for fenced code
   mdparse.py         markdown -> tokens, blocks + exact spans (VNote's cmark)
+  theme.py           loader for VNote-style .theme JSON
+  themes/native.theme  VNote's Native theme (LGPL-3.0, see notices)
   highlight.py       Pygments token runs for fenced code (off the GUI thread)
   renderer/
     render_worker.py RenderWorker -- parses Markdown off the GUI thread

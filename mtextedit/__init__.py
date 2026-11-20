@@ -13,26 +13,31 @@ Public surface
 * :class:`OutlineView` / :class:`OutlineModel` -- AST-derived outline.
 * :class:`FindReplaceWidget` -- in-file find & replace.
 * :class:`GitHubLightStyle` -- Pygments style for fenced code blocks.
+* :class:`Theme` / :func:`load_default` -- VNote ``.theme`` support; the
+  bundled Native theme is the default look.
 """
 
 from .code_style import GitHubLightStyle
 from .editor import MTextEdit
+from .find_replace import FindReplaceWidget
 from .highlighter import MarkdownHighlighter
 from .outline import OutlineModel, OutlineView
-from .find_replace import FindReplaceWidget
-from .renderer import RenderManager, RenderWorker, PreviewWidget
+from .renderer import PreviewWidget, RenderManager, RenderWorker
+from .theme import Theme, load_default
 
 __version__ = "0.1.0"
 
 __all__ = [
+    "FindReplaceWidget",
+    "GitHubLightStyle",
     "MTextEdit",
     "MarkdownHighlighter",
     "OutlineModel",
     "OutlineView",
-    "FindReplaceWidget",
+    "PreviewWidget",
     "RenderManager",
     "RenderWorker",
-    "PreviewWidget",
-    "GitHubLightStyle",
+    "Theme",
     "__version__",
+    "load_default",
 ]
