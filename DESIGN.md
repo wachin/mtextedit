@@ -318,7 +318,7 @@ strong/emphasis/code/link/strike/mark get its colours. VNote is LGPL-3.0 and
 `themes/README.md` and `THIRD_PARTY_NOTICES.md`), while the loader is our code.
 
 **Consequences.** The editor now looks like VNote for the constructs the
-highlighter styles. Inline styling uses exact cmark spans and markers dim off
+highlighter styles. Inline styling uses exact cmark spans and markers are cropped off
 the cursor line (D17); a host that does not want the VNote look can pass its
 own `Theme` to `MarkdownHighlighter` or call `set_theme()` at runtime.
 
@@ -328,20 +328,52 @@ own `Theme` to `MarkdownHighlighter` or call `set_theme()` at runtime.
 cmark parse (`mdparse.parse_document`). `MarkdownHighlighter.set_spans()`
 replaces the regex inline styling: strong, emphasis, inline code, links, images,
 strikethrough, mark and inline math are applied at the parser's own offsets.
-Regexes remain only as a fallback until the first render arrives. Markers are
-styled normally on the cursor's line and dimmed with the theme's text colour at
-30% alpha elsewhere.
+Regexes remain only as a fallback until the first render arrives. This is the
+path used when `use_custom_layout=False`; the editor default is the layout in
+D18. Markers are styled normally on the cursor's line and cropped elsewhere: the highlighter
+applies a transparent copy of the span format with negative absolute letter
+spacing equal to the run's average glyph advance, so the run keeps its characters
+but occupies zero width.
 
 **Why.** Regexes mis-style nested emphasis, escaped markers, code with inner
 backticks and destinations containing parentheses; cmark already computes exact
-extents and delimiter spans. Dimming markers keeps the source readable while
-signalling structure, without hiding characters.
+extents and delimiter spans. Qt's `QSyntaxHighlighter` cannot delete a run's
+advance directly, but letter spacing is a font property the layout honours, so
+the source text stays intact, caret positions land at the run's start and the
+line reflows to the VNote-like "no markers" look. A custom
+`QAbstractTextDocumentLayout` would mean reimplementing line layout, caret,
+selection and IME for the same visual result.
 
-**Consequences.** Width-collapsing concealment -- VNote hides markers entirely
-through a custom document layout -- is **not** implemented: Qt's
-`QSyntaxHighlighter` can style text but cannot remove its advance. That remains a
-separate, larger decision (custom layout, or marker dimming as the accepted
-behaviour). Cursor movement rehighlights only the previous and current blocks.
+**Consequences.** Markers expand again on the cursor's line, and
+`set_conceal_markers(False)` disables cropping. A very small font size (0.1 pt)
+triggered a Qt layout loop with `NoWrap`; the letter-spacing mechanism avoids
+that. Only spans that carry markers are cropped -- heading `#` markers are not
+covered yet. Cursor movement rehighlights only the previous and current blocks.
+
+---
+
+## D18. A custom layout prototype owns concealment (opt-in)
+
+**Decision.** `mtextedit.layout.MarkdownDocumentLayout` is a
+`QAbstractTextDocumentLayout` that paints each block from a *display* string with
+the concealed marker ranges removed, keeping a document<->display position map
+for cursor, selection and hit testing. It is the editor default
+(`MTextEdit(use_custom_layout=True)`); `use_custom_layout=False` keeps the
+`QSyntaxHighlighter` fallback (D17).
+
+**Why.** Format-level cropping works, but constructs that need layout control
+(heading markers, embedded previews, folding) cannot be expressed through
+character formats. VNote's approach -- a custom layout on top of
+`QTextDocument` -- is the proven middle ground between fighting Qt's layout and
+writing a text engine; this module is our implementation, and only the
+architecture was studied (VNote is LGPL-3.0; no code copied).
+
+**Consequences.** Phase 1 covers plain blocks, character formats from spans and
+regions, concealment, cursor, selection and hit testing. Not covered yet: IME
+(Input Method Editor) pre-edit text, inline images/math/tables, full-width
+selection, code-block backgrounds, list guides, accessibility verification, and
+large-document performance (an edit clears every block layout). These gaps are
+known and tracked here; the layout is the default while they are closed.
 
 ---
 

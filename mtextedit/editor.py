@@ -31,9 +31,17 @@ class MTextEdit(QTextEdit):
     # Emitted (debounced) with the full document source whenever the user edits.
     renderRequested = pyqtSignal(str)
 
-    def __init__(self, parent=None, render_delay_ms: int = 120):
+    def __init__(self, parent=None, render_delay_ms: int = 120,
+                 use_custom_layout: bool = True):
         super().__init__(parent)
         self._highlighter = MarkdownHighlighter(self.document())
+        self._custom_layout = None
+        if use_custom_layout:
+            from .layout import MarkdownDocumentLayout
+
+            self._custom_layout = MarkdownDocumentLayout(self.document())
+            self.document().setDocumentLayout(self._custom_layout)
+            self._highlighter.setDocument(None)
         self.cursorPositionChanged.connect(self._sync_cursor_line)
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
@@ -74,7 +82,12 @@ class MTextEdit(QTextEdit):
     def set_render_manager(self, manager):
         """Attach the editor to a RenderManager (highlight regions + images)."""
         self._manager = manager
-        self._highlighter.set_manager(manager)
+        if self._custom_layout is not None:
+            if manager is not None:
+                manager.spansAvailable.connect(self._custom_layout.set_spans)
+                manager.structureAvailable.connect(self._custom_layout.set_regions)
+        else:
+            self._highlighter.set_manager(manager)
         if manager is not None:
             manager.set_base_path(self._base_path)
 
@@ -123,7 +136,11 @@ class MTextEdit(QTextEdit):
         return self.textCursor().blockNumber()
 
     def _sync_cursor_line(self):
-        self._highlighter.set_cursor_line(self.textCursor().blockNumber())
+        line = self.textCursor().blockNumber()
+        if self._custom_layout is not None:
+            self._custom_layout.set_cursor_block(line)
+        else:
+            self._highlighter.set_cursor_line(line)
 
     # -- in-place preview ----------------------------------------------------
     def set_inplace_preview_enabled(self, enabled: bool):
@@ -201,10 +218,12 @@ class MTextEdit(QTextEdit):
             block = doc.findBlockByNumber(spec.block)
             if not block.isValid():
                 continue
-            caret = self.cursorRect(QTextCursor(block))
+            block_rect = doc.documentLayout().blockBoundingRect(block)
             margin = int(spec.height)
-            band = QRectF(caret.left(), caret.top() - margin,
-                          width - caret.left() - 6, margin)
+            # The block's top margin is exactly the reserved preview band; use
+            # the layout rect (works for both the Qt layout and our own).
+            band = QRectF(block_rect.left(), block_rect.top(),
+                          width - block_rect.left() - 6, margin)
             if not band.intersects(event_rect):
                 continue
             inplace.paint_spec(painter, spec, band)

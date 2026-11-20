@@ -27,6 +27,10 @@ the third-party work it builds on or depends on.
   from VNote's `src/data/extra/themes/native/text-editor.theme`. LGPL-3.0,
   copyright the VNote authors; the file keeps its own license and the rest of
   `mtextedit` remains MIT. See `mtextedit/themes/README.md`.
+* **VNote layout architecture** -- VNote's `TextDocumentLayout`
+  (`QAbstractTextDocumentLayout`, LGPL-3.0) was studied for the design of
+  `mtextedit/layout.py`. No VNote code is copied; the implementation is
+  original.
 * **VNote `.theme` format** — `mtextedit/theme.py` parses the JSON layout used
   by VNote: `markdown-syntax-styles` and `markdown-editor-styles`. The loader
   is independent code.

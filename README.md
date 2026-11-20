@@ -14,9 +14,10 @@ threaded, coalesced rendering) rather than the language.
 mtextedit/
   editor.py          MTextEdit -- QTextEdit surface with in-place preview
   inplace.py         code/table/image previews drawn above their source block
-  highlighter.py     MarkdownHighlighter -- block regions (async) + inline regex
+  highlighter.py     fallback highlighter -- block regions + inline styles
   code_style.py      GitHubLightStyle -- Pygments palette for fenced code
   mdparse.py         markdown -> tokens, blocks + exact spans (VNote's cmark)
+  layout.py          custom QAbstractTextDocumentLayout (default, concealment)
   theme.py           loader for VNote-style .theme JSON
   themes/native.theme  VNote's Native theme (LGPL-3.0, see notices)
   highlight.py       Pygments token runs for fenced code (off the GUI thread)
@@ -43,8 +44,9 @@ layout. Toggle it from the **View → In-place Preview** menu.
 Fenced code is painted token by token with Pygments runs computed on the render
 worker, and tables size their columns from their content (bold headers,
 ellipsis for cells that still do not fit) instead of splitting the band evenly.
-Inline styling uses cmark's exact source spans (not regexes), and syntax markers
-are dimmed on lines that do not hold the cursor.
+The editor defaults to a custom `QAbstractTextDocumentLayout` that removes
+syntax markers from the display string on lines without the cursor; the
+highlighter is the fallback and crops them with letter spacing.
 
 The full decision record (why a single pane, why `QTextEdit`, why block margins
 instead of a custom layout, preview scope and limitations) is in
