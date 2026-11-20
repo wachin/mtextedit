@@ -220,10 +220,11 @@ class MTextEdit(QTextEdit):
                 continue
             block_rect = doc.documentLayout().blockBoundingRect(block)
             margin = int(spec.height)
-            # The block's top margin is exactly the reserved preview band; use
-            # the layout rect (works for both the Qt layout and our own).
-            band = QRectF(block_rect.left(), block_rect.top(),
-                          width - block_rect.left() - 6, margin)
+            # Document coordinates must be translated by the scroll offset;
+            # the band is exactly the block's reserved top margin.
+            left = block_rect.left() - self.horizontalScrollBar().value()
+            top = block_rect.top() - self.verticalScrollBar().value()
+            band = QRectF(left, top, width - left - 6, margin)
             if not band.intersects(event_rect):
                 continue
             inplace.paint_spec(painter, spec, band)

@@ -256,6 +256,15 @@ class MarkdownDocumentLayout(QAbstractTextDocumentLayout):
             heading = re.match(r"^(\s{0,3})(#{1,6})(\s+)", block.text())
             if heading:
                 ranges.append((heading.start(2), heading.end(3)))
+            closing = re.search(r"\s+#+\s*$", block.text())
+            if closing:
+                ranges.append((closing.start(), len(block.text())))
+        if self._is_setext_underline(block):
+            ranges.append((0, len(block.text())))
+        if region is not None and region.get("kind") == "quote":
+            quote = re.match(r"^(\s{0,3}(?:>\s?)+)", block.text())
+            if quote:
+                ranges.append((quote.start(1), quote.end(1)))
         for span in self._spans:
             if span.end <= start or span.start >= end:
                 continue
@@ -350,6 +359,16 @@ class MarkdownDocumentLayout(QAbstractTextDocumentLayout):
                              preedit_display_pos, len(preedit_text))
         self._blocks[number] = entry
         return entry
+
+    def _is_setext_underline(self, block: QTextBlock) -> bool:
+        text = block.text().strip()
+        if not text or not (set(text) <= {"="} or set(text) <= {"-"}):
+            return False
+        previous = block.previous()
+        if not previous.isValid():
+            return False
+        region = self._region_for(previous.blockNumber())
+        return region is not None and region.get("kind") == "heading"
 
     def _region_for(self, number: int):
         for region in self._regions:

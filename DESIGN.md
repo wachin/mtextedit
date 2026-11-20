@@ -369,7 +369,8 @@ writing a text engine; this module is our implementation, and only the
 architecture was studied (VNote is LGPL-3.0; no code copied).
 
 **Consequences.** Phase 1 covers plain blocks, span/region formats,
-concealment (inline markers and ATX heading hashes), cursor, selection
+concealment (inline markers, ATX leading/closing hashes, setext underlines
+and blockquote markers), cursor, selection
 (including full-width selection) and hit testing. Code-block regions get the
 shared code background and left border; nested lists get vertical guides at
 their indentation levels. IME (Input Method Editor) pre-edit text is read from

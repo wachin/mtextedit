@@ -231,6 +231,19 @@ class LayoutTest(unittest.TestCase):
         self.assertEqual(_list_level("    - c"), 3)
         self.assertEqual(_list_level("continuation"), 0)
 
+    def test_closing_heading_hashes_are_concealed(self):
+        _editor, layout = self._editor("## Closed heading ##", cursor_block=-1)
+        self.assertEqual(layout._blocks[0].display, "Closed heading")
+
+    def test_setext_underline_is_concealed(self):
+        _editor, layout = self._editor("Title\n=====\n", cursor_block=-1)
+        self.assertEqual(layout._blocks[0].display, "Title")
+        self.assertEqual(layout._blocks[1].display, "")
+
+    def test_blockquote_markers_are_concealed(self):
+        _editor, layout = self._editor("> quoted text", cursor_block=-1)
+        self.assertEqual(layout._blocks[0].display, "quoted text")
+
 
 if __name__ == "__main__":
     unittest.main()
