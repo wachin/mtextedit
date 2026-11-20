@@ -61,6 +61,25 @@ class MathPreviewTest(unittest.TestCase):
         layout._refresh()
         self.assertIn("x^2", layout._blocks[start + 1].display)
 
+    def test_inline_formula_uses_a_placeholder(self):
+        text = "inline $x^2$ here\n\nother\n"
+        editor = MTextEdit()
+        editor.setPlainText(text)
+        parsed = mdparse.parse_document(text)
+        layout = editor._custom_layout
+        layout.set_spans(parsed.spans)
+        editor.setTextCursor(
+            QTextCursor(editor.document().findBlockByNumber(2)))
+        layout._refresh()
+        entry = layout._blocks[0]
+        self.assertNotIn("$", entry.display)
+        self.assertNotIn("x^2", entry.display)
+        self.assertTrue(entry.inline_previews)
+
+        editor.setTextCursor(QTextCursor(editor.document().firstBlock()))
+        layout._refresh()
+        self.assertIn("$x^2$", layout._blocks[0].display)
+
 
 if __name__ == "__main__":
     unittest.main()

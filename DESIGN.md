@@ -378,8 +378,8 @@ the block's layout and painted underlined; the commit reachable from it updates
 the document normally. Unaffected block layouts are reused across edits, so
 typing rebuilds only the edited block; the block walk is still O(blocks).
 
-Block previews (code, tables, images and block math, D19) are embedded in the
-layout; inline math remains source. PyQt6 does not expose `QAccessible`, so
+Block previews (code, tables, images and block math, D19) and inline math are
+embedded in the layout. PyQt6 does not expose `QAccessible`, so
 assistive-technology verification is manual; the editor sets an accessible
 name and description and keeps Qt's document model, which owns selection,
 caret and text exposure.
@@ -392,7 +392,8 @@ caret and text exposure.
 matplotlib's `mathtext` into a pixmap; the layout embeds them like code, tables
 and images when the cursor is elsewhere. Matplotlib is an optional extra
 (`pip install -e ".[math]"`); without it the TeX source stays visible. Inline
-math is still source.
+math uses a one-character placeholder whose letter spacing matches the scaled
+formula width, with the pixmap painted on the line.
 
 **Why.** Hosts such as Sola Study Bible's note panel rarely need formulas, so
 matplotlib must not be a hard dependency. When MarkTux opens Markdown articles,
@@ -401,9 +402,10 @@ object replacement and width reservation inside the custom layout, which is a
 larger change than a block preview.
 
 **Consequences.** Rendering happens lazily on the GUI thread, cached by TeX
-source; invalid TeX falls back to the source. `MPLCONFIGDIR` is redirected to a
-temporary cache only when math is requested, and the extra stays out of
-`requirements.txt`.
+source; invalid TeX falls back to the source. Inline formulas scale to the line
+height (complex ones can look small) and do not change line height. `MPLCONFIGDIR`
+is redirected to a temporary cache only when math is requested, and the extra
+stays out of `requirements.txt`.
 
 ---
 

@@ -25,13 +25,14 @@ is original and only the behaviour/architecture was studied. See
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from PyQt6.QtCore import QPointF, QRectF, QSizeF, Qt
 from PyQt6.QtGui import (
     QAbstractTextDocumentLayout,
     QColor,
     QFont,
+    QFontMetricsF,
     QPen,
     QTextBlock,
     QTextCharFormat,
@@ -94,6 +95,7 @@ class _BlockLayout:
     preedit_display_pos: int
     preedit_len: int
     preview: object | None = None
+    inline_previews: list = field(default_factory=list)
 
     @property
     def height(self) -> float:
@@ -113,6 +115,43 @@ def _list_level(text: str) -> int:
     if not stripped or not (stripped[0] in "-*+" or stripped[0].isdigit()):
         return 0
     return (len(text) - len(stripped)) // 2 + 1
+
+
+def _transform_map(text: str, hidden: list[tuple[int, int]],
+                   replacements: list[tuple[int, int, str]]):
+    """Visible map with hidden ranges removed and other ranges replaced."""
+    replace = sorted(replacements)
+    visible = [True] * len(text)
+    for start, end in hidden:
+        for index in range(max(0, start), min(len(text), end)):
+            visible[index] = False
+    display: list[str] = []
+    display_to_doc: list[int] = []
+    doc_to_display = [0] * (len(text) + 1)
+    index = 0
+    replace_index = 0
+    display_index = 0
+    while index < len(text):
+        doc_to_display[index] = display_index
+        if (replace_index < len(replace)
+                and index == replace[replace_index][0]):
+            start, end, placeholder = replace[replace_index]
+            for inside in range(start, end):
+                doc_to_display[inside] = display_index
+            for char in placeholder:
+                display.append(char)
+                display_to_doc.append(start)
+                display_index += 1
+            index = end
+            replace_index += 1
+            continue
+        if visible[index]:
+            display.append(text[index])
+            display_to_doc.append(index)
+            display_index += 1
+        index += 1
+    doc_to_display[len(text)] = display_index
+    return "".join(display), display_to_doc, doc_to_display
 
 
 def _visible_map(text: str, hidden: list[tuple[int, int]]):
@@ -338,8 +377,35 @@ class MarkdownDocumentLayout(QAbstractTextDocumentLayout):
                 and cached.bottom_margin == bottom_margin):
             return cached
 
-        display, display_to_doc, doc_to_display = _visible_map(
-            text, self._hidden_ranges(block))
+        hidden = self._hidden_ranges(block)
+        replacements: list[tuple[int, int, str]] = []
+        inline_sources: list[tuple[int, object]] = []
+        if number != self._cursor_block:
+            from . import inplace
+
+            block_start = block.position()
+            block_end = block_start + len(text)
+            for span in self._spans:
+                if span.style != "math":
+                    continue
+                local_start = max(span.content_start, block_start) - block_start
+                local_end = min(span.content_end, block_end) - block_start
+                if local_end <= local_start:
+                    continue
+                if any(start < local_end and local_start < end
+                       for start, end in hidden):
+                    continue
+                tex = text[local_start:local_end].strip().strip("$").strip()
+                pixmap = inplace._math_pixmap(tex)
+                if pixmap is not None and not pixmap.isNull():
+                    replacements.append((local_start, local_end, "\u00a0"))
+                    inline_sources.append((local_start, pixmap))
+
+        if replacements:
+            display, display_to_doc, doc_to_display = _transform_map(
+                text, hidden, replacements)
+        else:
+            display, display_to_doc, doc_to_display = _visible_map(text, hidden)
         preedit_display_pos = doc_to_display[min(max(preedit_position, 0), len(text))]
         if preedit_text:
             display = (display[:preedit_display_pos] + preedit_text
@@ -373,6 +439,23 @@ class MarkdownDocumentLayout(QAbstractTextDocumentLayout):
                 continue
             formats.append(_format_range(
                 display_begin, display_end - display_begin, style_format))
+        inline_previews: list[tuple[int, object, float, float]] = []
+        if inline_sources:
+            metrics = QFontMetricsF(self.document().defaultFont())
+            line_height = metrics.height()
+            base_advance = metrics.horizontalAdvance("\u00a0")
+            for local_start, pixmap in inline_sources:
+                position = doc_to_display[local_start]
+                scale = min(1.0, (line_height * 1.25) / max(1, pixmap.height()))
+                width = pixmap.width() * scale
+                height = pixmap.height() * scale
+                placeholder = QTextCharFormat()
+                placeholder.setForeground(QColor(0, 0, 0, 0))
+                placeholder.setFontLetterSpacingType(
+                    QFont.SpacingType.AbsoluteSpacing)
+                placeholder.setFontLetterSpacing(width - base_advance)
+                formats.append(_format_range(position, 1, placeholder))
+                inline_previews.append((position, pixmap, width, height))
         if preedit_text:
             underline = QTextCharFormat()
             underline.setFontUnderline(True)
@@ -397,7 +480,8 @@ class MarkdownDocumentLayout(QAbstractTextDocumentLayout):
                              top_margin + y + bottom_margin, layout, display,
                              display_to_doc, doc_to_display, text,
                              preedit_text, preedit_position,
-                             preedit_display_pos, len(preedit_text))
+                             preedit_display_pos, len(preedit_text),
+                             inline_previews=inline_previews)
         self._blocks[number] = entry
         return entry
 
@@ -566,6 +650,18 @@ class MarkdownDocumentLayout(QAbstractTextDocumentLayout):
                             display_start, display_end - display_start,
                             selection.format))
             entry.layout.draw(painter, offset, formats, clip)
+
+            for position, pixmap, width, height in entry.inline_previews:
+                for index in range(entry.layout.lineCount()):
+                    line = entry.layout.lineAt(index)
+                    if (line.textStart() <= position
+                            <= line.textStart() + line.textLength()):
+                        x = line.cursorToX(position)[0]
+                        y = line.y() + (line.height() - height) / 2
+                        painter.drawPixmap(
+                            QRectF(offset.x() + x, offset.y() + y,
+                                   width, height), pixmap, QRectF(pixmap.rect()))
+                        break
 
             cursor = context.cursorPosition
             if cursor < -1 and entry.preedit_len:

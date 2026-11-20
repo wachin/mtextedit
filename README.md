@@ -173,8 +173,8 @@ Block formulas render through matplotlib when the extra is installed:
 pip install -e ".[math]"
 ```
 
-Without it, TeX source remains visible. Inline math is not embedded yet;
-block formulas are (D19).
+Without it, TeX source remains visible. Inline and block formulas are embedded
+when the extra is installed (D19).
 
 ## Install
 
