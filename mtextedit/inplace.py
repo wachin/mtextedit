@@ -17,7 +17,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
-from PyQt6.QtCore import QRectF, Qt
+from PyQt6.QtCore import QPointF, QRectF, Qt
 from PyQt6.QtGui import (
     QColor,
     QFont,
@@ -66,7 +66,8 @@ def build_specs(tokens: List[Any], base_path: Optional[str] = None) -> List[Prev
             if ty == "fence" and tok.info:
                 lang = tok.info.strip().split()[0]
             specs.append(PreviewSpec(block=line, kind="code",
-                                     data={"lang": lang, "code": tok.content}))
+                                     data={"lang": lang, "code": tok.content,
+                                           "highlight": tok.meta.get("highlight")}))
             i += 1
         elif ty == "table_open":
             line = tok.map[0] if tok.map else 0
@@ -271,13 +272,32 @@ def _paint_code(painter: QPainter, spec: PreviewSpec, rect: QRectF) -> None:
     fm_h = spec.data.get("fm_height", 14.0)
     ascent = spec.data.get("fm_ascent", 11.0)
     left = rect.left() + _PAD
-    for line in spec.data.get("lines", []):
+    text_width = rect.width() - 2 * _PAD
+    # ``highlight`` holds Pygments runs produced by the render worker (D12).
+    # Without them — unknown language, indented block, oversized fence — the
+    # line paints flat, exactly as before.
+    runs = spec.data.get("highlight") or []
+    metrics = QFontMetricsF(f)
+    painter.save()
+    painter.setClipRect(QRectF(left, rect.top(), text_width, rect.height()))
+    for index, line in enumerate(spec.data.get("lines", [])):
         if y + fm_h > rect.bottom():
             break
-        painter.drawText(QRectF(left, y, rect.width() - 2 * _PAD, fm_h),
-                         int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop),
-                         line.expandtabs(4))
+        line_runs = runs[index] if index < len(runs) else None
+        if line_runs:
+            x = left
+            baseline = y + ascent
+            for text, colour in line_runs:
+                painter.setPen(QColor(colour))
+                painter.drawText(QPointF(x, baseline), text)
+                x += metrics.horizontalAdvance(text)
+        else:
+            painter.setPen(_CODE_FG)
+            painter.drawText(QRectF(left, y, text_width, fm_h),
+                             int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop),
+                             line.expandtabs(4))
         y += fm_h
+    painter.restore()
 
 
 def _paint_table(painter: QPainter, spec: PreviewSpec, rect: QRectF) -> None:

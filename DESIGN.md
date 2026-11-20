@@ -192,7 +192,10 @@ and coalesces requests and uses a generation token, so a stale parse is discarde
 and never reaches the preview.
 
 **Consequences.** Image decoding now happens off-thread in `RenderWorker`; only
-the `QImage → QPixmap` conversion happens on the GUI thread (see D13). Painting
+the `QImage → QPixmap` conversion happens on the GUI thread (see D13). Code
+fences get their Pygments colour runs on the worker too (`highlight.
+annotate_code_runs`) and travel on the token stream, so the GUI thread only
+draws strings it receives. Painting
 is synchronous per `paintEvent`, which is the correct Qt model.
 `tokensAvailable` carries plain Python token objects (no GUI types), so it is
 safe to emit across threads.
@@ -253,11 +256,11 @@ GitHub Light style, and the preview already drew its code card in GitHub's light
 colours (`#f6f8fa` on `#d0d7de`). Colour values are GitHub Inc.'s (MIT); the
 mapping onto Pygments token types is ours.
 
-**Consequences.** The editor has exactly one highlighter (Pygments). Fenced code
-in the in-place preview still paints flat text; colouring it token-by-token is a
-separate, smaller change that now has a ready style to paint with. The palette
-lives in a normal Python module, so no build step, submodule or C++ toolchain is
-needed to keep or extend it.
+**Consequences.** The editor has exactly one highlighter (Pygments), and the
+in-place preview paints fenced code token by token using this style, with flat
+monospace as the fallback for unknown languages, indented blocks and oversized
+fences. The palette lives in a normal Python module, so no build step, submodule
+or C++ toolchain is needed to keep or extend it.
 
 ---
 

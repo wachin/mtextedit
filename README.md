@@ -16,6 +16,7 @@ mtextedit/
   inplace.py         code/table/image previews drawn above their source block
   highlighter.py     MarkdownHighlighter -- block regions (async) + inline regex
   code_style.py      GitHubLightStyle -- Pygments palette for fenced code
+  highlight.py       Pygments token runs for fenced code (off the GUI thread)
   renderer/
     render_worker.py RenderWorker -- parses Markdown off the GUI thread
     render_manager.py RenderManager -- debounce + coalesce + priority cancel
@@ -68,8 +69,9 @@ instead of a custom layout, preview scope and limitations) is in
 
 > There is no bundled C++ highlighting engine: the KSyntaxHighlighting fork was
 > removed, and code blocks are highlighted with Pygments. Its MIT-licensed
-> GitHub Light palette survives as `mtextedit.code_style.GitHubLightStyle`, the
-> style the preview paints code with (see `DESIGN.md` D14).
+> GitHub Light palette survives as `mtextedit.code_style.GitHubLightStyle`, which
+> the in-place preview paints fenced code with, token by token, using runs
+> computed on the render worker (see `DESIGN.md` D12 and D14).
 
 ## Usage
 

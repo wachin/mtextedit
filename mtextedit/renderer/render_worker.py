@@ -55,8 +55,12 @@ class RenderWorker(QRunnable):
         tokens = self.md.parse(self.source)
 
         from .._markdown import extract_headings, collect_block_regions
+        from ..highlight import annotate_code_runs
         headings = extract_headings(tokens)
         regions = collect_block_regions(tokens)
+        # Pygments runs for fenced code stay on this thread; the token stream
+        # carries them to the GUI as plain strings (D12).
+        annotate_code_runs(tokens)
 
         # Priority-cancel point: a newer keystroke may have arrived.
         if self._stale():

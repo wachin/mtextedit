@@ -13,9 +13,11 @@ Design notes
   and exposes a token stream we reuse for the outline and for editor
   highlighting -- mirroring how VNote derived its outline from the cmark AST
   rather than regex-scanning the source.
-* Code blocks: highlighted with Pygments when rendering to HTML. The native
-  ``QTextDocument`` preview renders code blocks in a monospace face (per-token
-  colouring is left as a documented extension point).
+* Code blocks: highlighted with Pygments, sharing ``code_style.GitHubLightStyle``
+  with the in-place preview. The in-place token runs are computed on the render
+  worker (``highlight.annotate_code_runs``) and travel on the token stream, so
+  the GUI thread never runs a lexer; the full-document ``QTextDocument`` preview
+  keeps a plain monospace face.
 * The native preview (``build_document``) replaces VNote's full-document
   ``QWebEngineView.setHtml`` reload. We build a ``QTextDocument`` directly
   from the token stream, which keeps the heavy parse on a worker thread and
@@ -59,11 +61,14 @@ def _render_fence_pygments(self, tokens, idx, options, env):
         from pygments.formatters import HtmlFormatter
         from pygments.lexers import get_lexer_by_name, guess_lexer
 
+        from .code_style import GitHubLightStyle
+
         try:
             lexer = get_lexer_by_name(lang, stripall=False)
         except Exception:
             lexer = guess_lexer(text)
-        highlighted = highlight(text, lexer, HtmlFormatter(nowrap=True))
+        highlighted = highlight(
+            text, lexer, HtmlFormatter(nowrap=True, style=GitHubLightStyle))
         classes = f"language-{lang}" if lang else ""
         return (
             f'<pre class="code-block {classes}"><code>{highlighted}</code></pre>\n'
