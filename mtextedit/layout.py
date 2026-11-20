@@ -33,6 +33,7 @@ from PyQt6.QtGui import (
     QFont,
     QTextBlock,
     QTextCharFormat,
+    QTextFormat,
     QTextLayout,
     QTextOption,
 )
@@ -78,11 +79,17 @@ class _BlockLayout:
     top: float
     text_top: float
     top_margin: float
+    bottom_margin: float
     total_height: float
     layout: QTextLayout
     display: str
     display_to_doc: list[int]
     doc_to_display: list[int]
+    source: str
+    preedit_text: str
+    preedit_position: int
+    preedit_display_pos: int
+    preedit_len: int
 
     @property
     def height(self) -> float:
@@ -184,13 +191,29 @@ class MarkdownDocumentLayout(QAbstractTextDocumentLayout):
     def _margin(self) -> float:
         return self.document().documentMargin()
 
+    def _sync_preedit(self) -> None:
+        for number, entry in list(self._blocks.items()):
+            block = entry.block
+            if not block.isValid():
+                self._blocks.pop(number)
+                self._dirty = True
+                continue
+            layout = block.layout()
+            text = (layout.preeditAreaText() if layout else "") or ""
+            position = layout.preeditAreaPosition() if layout else 0
+            if text != entry.preedit_text or position != entry.preedit_position:
+                self._blocks.pop(number)
+                self._dirty = True
+
     def _refresh(self) -> None:
+        self._sync_preedit()
         if not self._dirty:
             return
         self._dirty = False
         margin = self._margin()
         top = margin
         width = 0.0
+        seen: set[int] = set()
         block = self.document().firstBlock()
         while block.isValid():
             if block.isVisible():
@@ -199,7 +222,11 @@ class MarkdownDocumentLayout(QAbstractTextDocumentLayout):
                 entry.text_top = top + entry.top_margin
                 top += entry.height
                 width = max(width, entry.width)
+                seen.add(block.blockNumber())
             block = block.next()
+        for number in list(self._blocks):
+            if number not in seen:
+                self._blocks.pop(number)
         text_width = self.document().textWidth()
         if text_width > 0:
             self._width = max(width, text_width)
@@ -228,13 +255,34 @@ class MarkdownDocumentLayout(QAbstractTextDocumentLayout):
 
     def _layout_block(self, block: QTextBlock) -> _BlockLayout:
         number = block.blockNumber()
+        text = block.text()
+        block_layout = block.layout()
+        preedit_text = (block_layout.preeditAreaText() if block_layout else "") or ""
+        preedit_position = block_layout.preeditAreaPosition() if block_layout else 0
+        block_format = block.blockFormat()
+        top_margin = block_format.topMargin()
+        bottom_margin = block_format.bottomMargin()
+
         cached = self._blocks.get(number)
-        if cached is not None:
+        if (cached is not None and cached.block == block
+                and cached.source == text
+                and cached.preedit_text == preedit_text
+                and cached.preedit_position == preedit_position
+                and cached.top_margin == top_margin
+                and cached.bottom_margin == bottom_margin):
             return cached
 
-        text = block.text()
         display, display_to_doc, doc_to_display = _visible_map(
             text, self._hidden_ranges(block))
+        preedit_display_pos = doc_to_display[min(max(preedit_position, 0), len(text))]
+        if preedit_text:
+            display = (display[:preedit_display_pos] + preedit_text
+                       + display[preedit_display_pos:])
+            display_to_doc = (display_to_doc[:preedit_display_pos]
+                              + [preedit_position] * len(preedit_text)
+                              + display_to_doc[preedit_display_pos:])
+            for index in range(preedit_position + 1, len(text) + 1):
+                doc_to_display[index] += len(preedit_text)
         layout = QTextLayout(display, self.document().defaultFont())
         option = QTextOption()
         if self.document().textWidth() <= 0:
@@ -259,6 +307,11 @@ class MarkdownDocumentLayout(QAbstractTextDocumentLayout):
                 continue
             formats.append(_format_range(
                 display_begin, display_end - display_begin, style_format))
+        if preedit_text:
+            underline = QTextCharFormat()
+            underline.setFontUnderline(True)
+            formats.append(_format_range(preedit_display_pos,
+                                         len(preedit_text), underline))
         layout.setFormats(formats)
 
         text_width = self.document().textWidth()
@@ -274,12 +327,11 @@ class MarkdownDocumentLayout(QAbstractTextDocumentLayout):
             y += line.height()
         layout.endLayout()
 
-        block_format = block.blockFormat()
-        top_margin = block_format.topMargin()
-        bottom_margin = block_format.bottomMargin()
-        entry = _BlockLayout(block, 0.0, 0.0, top_margin,
+        entry = _BlockLayout(block, 0.0, 0.0, top_margin, bottom_margin,
                              top_margin + y + bottom_margin, layout, display,
-                             display_to_doc, doc_to_display)
+                             display_to_doc, doc_to_display, text,
+                             preedit_text, preedit_position,
+                             preedit_display_pos, len(preedit_text))
         self._blocks[number] = entry
         return entry
 
@@ -367,6 +419,18 @@ class MarkdownDocumentLayout(QAbstractTextDocumentLayout):
             if clip.isValid() and not clip.intersects(rect):
                 continue
 
+            for selection in context.selections:
+                if (not selection.cursor.hasSelection()
+                        and selection.cursor.blockNumber() == number
+                        and selection.format.hasProperty(
+                            QTextFormat.Property.FullWidthSelection)):
+                    background = selection.format.background()
+                    if background.style() != Qt.BrushStyle.NoBrush:
+                        painter.fillRect(
+                            QRectF(rect.left(), rect.top(),
+                                   max(rect.width(), self._width - margin * 2),
+                                   entry.height), background)
+
             formats: list[QTextLayout.FormatRange] = []
             block_start = entry.block.position()
             block_end = block_start + len(entry.block.text())
@@ -383,7 +447,11 @@ class MarkdownDocumentLayout(QAbstractTextDocumentLayout):
             entry.layout.draw(painter, offset, formats, clip)
 
             cursor = context.cursorPosition
-            if block_start <= cursor <= block_end:
+            if cursor < -1 and entry.preedit_len:
+                display_cursor = entry.preedit_display_pos - (cursor + 2)
+                display_cursor = min(max(display_cursor, 0), len(entry.display))
+                entry.layout.drawCursor(painter, offset, display_cursor, 1)
+            elif block_start <= cursor <= block_end:
                 display_cursor = entry.doc_to_display[
                     min(cursor - block_start, len(entry.doc_to_display) - 1)]
                 entry.layout.drawCursor(painter, offset, display_cursor, 1)
@@ -391,7 +459,6 @@ class MarkdownDocumentLayout(QAbstractTextDocumentLayout):
 
     def documentChanged(self, position: int, chars_removed: int,
                         chars_added: int) -> None:
-        self._blocks.clear()
         self._dirty = True
         self._refresh()
         self.update.emit(QRectF(0, 0, max(self._width, 1.0), max(self._height, 1.0)))

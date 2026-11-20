@@ -19,7 +19,16 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from PyQt6.QtCore import QEventLoop, QPoint, QPointF, Qt, QTimer
-from PyQt6.QtGui import QTextCursor
+from PyQt6.QtGui import (
+    QAbstractTextDocumentLayout,
+    QColor,
+    QImage,
+    QInputMethodEvent,
+    QPainter,
+    QTextCharFormat,
+    QTextCursor,
+    QTextFormat,
+)
 from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication, QTextEdit
 
@@ -150,6 +159,50 @@ class LayoutTest(unittest.TestCase):
         editor = MTextEdit()
         self.assertIsNotNone(editor._custom_layout)
         self.assertIsNone(editor._highlighter.document())
+
+    def test_ime_preedit_is_laid_out_but_not_written_to_the_document(self):
+        editor, layout = self._editor("abc", cursor_block=0)
+        editor.setFocus()
+        QApplication.sendEvent(editor, QInputMethodEvent("にほ", []))
+        layout._refresh()
+        entry = layout._blocks[0]
+        self.assertEqual(entry.display, "にほabc")
+        self.assertEqual(entry.preedit_len, 2)
+        self.assertEqual(editor.toPlainText(), "abc")
+
+        commit = QInputMethodEvent()
+        commit.setCommitString("日本")
+        QApplication.sendEvent(editor, commit)
+        layout._refresh()
+        self.assertEqual(editor.toPlainText(), "日本abc")
+        self.assertEqual(layout._blocks[0].preedit_len, 0)
+
+    def test_editing_reuses_unaffected_block_layouts(self):
+        text = "\n".join(f"line {index}" for index in range(50))
+        editor, layout = self._editor(text, cursor_block=-1)
+        reused = layout._blocks[40]
+        cursor = QTextCursor(editor.document().firstBlock())
+        cursor.insertText("X")
+        layout._refresh()
+        self.assertIs(layout._blocks[40], reused)
+        self.assertIn("X", editor.toPlainText())
+
+    def test_full_width_selection_is_painted(self):
+        editor, layout = self._editor("abc\ndef", cursor_block=0)
+        image = QImage(240, 80, QImage.Format.Format_ARGB32)
+        image.fill(QColor("white"))
+        painter = QPainter(image)
+        context = QAbstractTextDocumentLayout.PaintContext()
+        selection = QAbstractTextDocumentLayout.Selection()
+        selection.cursor = QTextCursor(editor.document().firstBlock())
+        selection.format = QTextCharFormat()
+        selection.format.setBackground(QColor("red"))
+        selection.format.setProperty(QTextFormat.Property.FullWidthSelection, True)
+        context.selections = [selection]
+        layout.draw(painter, context)
+        painter.end()
+        pixel = image.pixelColor(230, 8)
+        self.assertEqual(pixel.name(), "#ff0000")
 
 
 if __name__ == "__main__":
