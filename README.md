@@ -137,6 +137,19 @@ decorator.set_spellcheck_enabled(True)
 Both `examples/demo.py` and `marktux/main.py` expose these under a **Tools** menu
 (*Dictionary Download Manager…* and *Spell Check*).
 
+## Editing shortcuts
+
+| Shortcut | Action |
+|---|---|
+| `Ctrl+B` | bold (`**text**`) |
+| `Ctrl+I` | italic (`*text*`) |
+| `Ctrl+K` | link (`[text]()`, caret inside the destination) |
+| `Ctrl+Backtick` | inline code (`` `text` ``) |
+| `Ctrl+Shift+X` | strikethrough (`~~text~~`) |
+
+Each shortcut wraps or unwraps the selection, and works on an empty caret by
+inserting the pair and placing the cursor inside it.
+
 ## Tests
 
 ```bash

@@ -19,7 +19,7 @@ from __future__ import annotations
 import os
 from typing import List, Optional
 
-from PyQt6.QtCore import QRectF, QTimer, pyqtSignal
+from PyQt6.QtCore import QRectF, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QPainter, QTextCursor
 from PyQt6.QtWidgets import QTextEdit
 
@@ -51,6 +51,10 @@ class MTextEdit(QTextEdit):
 
         self.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
         self.setAcceptRichText(False)
+        self.setAccessibleName("Markdown editor")
+        self.setAccessibleDescription(
+            "Markdown source editor. Syntax markers are concealed on lines "
+            "without the cursor.")
 
         self._base_path: Optional[str] = None
         self._inplace_enabled = True
@@ -78,6 +82,104 @@ class MTextEdit(QTextEdit):
             return
         self._last_emitted_text = text
         self.renderRequested.emit(text)
+
+    # -- editing shortcuts ---------------------------------------------------
+    def keyPressEvent(self, event):
+        modifiers = event.modifiers()
+        control = bool(modifiers & Qt.KeyboardModifier.ControlModifier)
+        shift = bool(modifiers & Qt.KeyboardModifier.ShiftModifier)
+        key = event.key()
+        if control and not shift and key == Qt.Key.Key_B:
+            self._toggle_inline("**")
+            return
+        if control and not shift and key == Qt.Key.Key_I:
+            self._toggle_inline("*")
+            return
+        if control and key == Qt.Key.Key_K:
+            self._insert_link()
+            return
+        if control and key == Qt.Key.Key_QuoteLeft:
+            self._toggle_inline("`")
+            return
+        if control and shift and key == Qt.Key.Key_X:
+            self._toggle_inline("~~")
+            return
+        super().keyPressEvent(event)
+
+    def _select(self, start: int, end: int) -> None:
+        cursor = QTextCursor(self.document())
+        cursor.setPosition(start)
+        cursor.setPosition(end, QTextCursor.MoveMode.KeepAnchor)
+        self.setTextCursor(cursor)
+
+    def _toggle_inline(self, marker: str) -> None:
+        """Wrap or unwrap the selection (or the caret) with a marker pair."""
+        cursor = self.textCursor()
+        start = cursor.selectionStart()
+        end = cursor.selectionEnd()
+        text = self.document().toPlainText()
+        size = len(marker)
+
+        if start == end:
+            if text[max(0, start - size):start] == marker and \
+                    text[start:start + size] == marker:
+                cursor.beginEditBlock()
+                cursor.setPosition(start - size)
+                cursor.setPosition(start + size, QTextCursor.MoveMode.KeepAnchor)
+                cursor.removeSelectedText()
+                cursor.endEditBlock()
+                self.setTextCursor(cursor)
+                return
+            cursor.insertText(marker + marker)
+            cursor.setPosition(start + size)
+            self.setTextCursor(cursor)
+            return
+
+        selected = text[start:end]
+        if (len(selected) >= 2 * size and selected.startswith(marker)
+                and selected.endswith(marker)):
+            inner = selected[size:-size]
+            cursor.beginEditBlock()
+            cursor.setPosition(start)
+            cursor.setPosition(end, QTextCursor.MoveMode.KeepAnchor)
+            cursor.insertText(inner)
+            cursor.endEditBlock()
+            self._select(start, start + len(inner))
+            return
+        if text[max(0, start - size):start] == marker and \
+                text[end:end + size] == marker:
+            cursor.beginEditBlock()
+            cursor.setPosition(start - size)
+            cursor.setPosition(end + size, QTextCursor.MoveMode.KeepAnchor)
+            cursor.insertText(selected)
+            cursor.endEditBlock()
+            self._select(start - size, end - size)
+            return
+
+        cursor.beginEditBlock()
+        cursor.setPosition(end)
+        cursor.insertText(marker)
+        cursor.setPosition(start)
+        cursor.insertText(marker)
+        cursor.endEditBlock()
+        self._select(start + size, end + size)
+
+    def _insert_link(self) -> None:
+        cursor = self.textCursor()
+        start = cursor.selectionStart()
+        end = cursor.selectionEnd()
+        if start == end:
+            cursor.insertText("[]()")
+            cursor.setPosition(cursor.position() - 3)
+        else:
+            selected = self.document().toPlainText()[start:end]
+            cursor.beginEditBlock()
+            cursor.setPosition(start)
+            cursor.setPosition(end, QTextCursor.MoveMode.KeepAnchor)
+            cursor.insertText(f"[{selected}]()")
+            cursor.endEditBlock()
+            cursor.setPosition(start + len(selected) + 3)
+        self.setTextCursor(cursor)
 
     def set_render_manager(self, manager):
         """Attach the editor to a RenderManager (highlight regions + images)."""

@@ -204,6 +204,10 @@ class MarkdownDocumentLayout(QAbstractTextDocumentLayout):
 
     def _sync_preedit(self) -> None:
         for number, entry in list(self._blocks.items()):
+            # Pre-edit only exists on the cursor block; other entries only
+            # need checking if they still carry a previous pre-edit.
+            if not entry.preedit_text and number != self._cursor_block:
+                continue
             block = entry.block
             if not block.isValid():
                 self._blocks.pop(number)

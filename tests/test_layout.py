@@ -244,6 +244,11 @@ class LayoutTest(unittest.TestCase):
         _editor, layout = self._editor("> quoted text", cursor_block=-1)
         self.assertEqual(layout._blocks[0].display, "quoted text")
 
+    def test_editor_exposes_accessible_text(self):
+        editor = MTextEdit()
+        self.assertEqual(editor.accessibleName(), "Markdown editor")
+        self.assertIn("Markdown", editor.accessibleDescription())
+
 
 if __name__ == "__main__":
     unittest.main()

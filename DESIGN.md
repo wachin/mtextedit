@@ -378,7 +378,10 @@ the block's layout and painted underlined; the commit reachable from it updates
 the document normally. Unaffected block layouts are reused across edits, so
 typing rebuilds only the edited block; the block walk is still O(blocks).
 
-Not covered yet: inline images/math/tables and accessibility verification.
+Not covered yet: inline images/math/tables. PyQt6 does not expose
+`QAccessible`, so assistive-technology verification is manual; the editor sets
+an accessible name and description and keeps Qt's document model, which owns
+selection, caret and text exposure.
 
 ---
 
