@@ -27,6 +27,7 @@ from mtextedit import MTextEdit, inplace, mdparse
 from mtextedit._markdown import collect_block_regions
 
 FIXTURE = Path(__file__).with_name("fixtures") / "golden-document.md"
+BASE = str(FIXTURE.parent)
 
 
 class GoldenDocumentTest(unittest.TestCase):
@@ -80,12 +81,16 @@ class GoldenDocumentTest(unittest.TestCase):
         self.assertIn('src="images/wide.png"', self.html)
 
     def test_preview_builds_code_table_and_image_specs(self):
-        specs = inplace.build_specs(self.parsed.tokens)
+        specs = inplace.build_specs(self.parsed.tokens, base_path=BASE)
         kinds = Counter(spec.kind for spec in specs)
         self.assertEqual(kinds["code"], 40)
         self.assertEqual(kinds["table"], 12)
         self.assertGreaterEqual(kinds["image"], 9)
-        self.assertTrue(inplace.measure_specs(specs, 880))
+        measured = inplace.measure_specs(specs, 880)
+        images = [spec for spec in measured if spec.kind == "image"]
+        self.assertTrue(images)
+        self.assertTrue(all(spec.data.get("pixmap") is not None
+                            for spec in images))
 
     def test_editor_renders_the_whole_document(self):
         editor = MTextEdit()
@@ -94,7 +99,7 @@ class GoldenDocumentTest(unittest.TestCase):
         editor._custom_layout.set_regions(
             collect_block_regions(self.parsed.tokens))
         specs = inplace.measure_specs(
-            inplace.build_specs(self.parsed.tokens), 880)
+            inplace.build_specs(self.parsed.tokens, base_path=BASE), 880)
         editor._apply_specs(specs)
         editor.resize(900, 700)
         editor.show()
@@ -105,6 +110,12 @@ class GoldenDocumentTest(unittest.TestCase):
         self.assertGreater(editor._custom_layout.documentSize().height(),
                            15000)
         self.assertFalse(editor.grab().isNull())
+
+        image = next(spec for spec in specs if spec.kind == "image")
+        entry = editor._custom_layout._blocks[image.block]
+        self.assertEqual(entry.display, "")
+        self.assertGreater(entry.height, 0)
+        self.assertEqual(entry.preview.kind, "image")
 
 
 if __name__ == "__main__":

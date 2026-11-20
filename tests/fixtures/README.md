@@ -9,6 +9,9 @@ sanitization, KaTeX and Mermaid. Those are React-specific contracts and do not
 apply to marktux; `test_golden_document.py` instead pins the parser, the
 cmark HTML output and the editor/preview pipeline.
 
+`images/` holds the fixture assets referenced by the document (`example.png`,
+`wide.png`, `tall.png`); `does-not-exist.png` is intentionally absent.
+
 `golden-document.html` is the exact `render_html()` output (task lists
 enabled). Regenerate it deliberately when the HTML contract changes:
 
