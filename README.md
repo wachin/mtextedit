@@ -16,6 +16,7 @@ mtextedit/
   inplace.py         code/table/image previews drawn above their source block
   highlighter.py     MarkdownHighlighter -- block regions (async) + inline regex
   code_style.py      GitHubLightStyle -- Pygments palette for fenced code
+  mdparse.py         markdown -> tokens, blocks + exact spans (VNote's cmark)
   highlight.py       Pygments token runs for fenced code (off the GUI thread)
   renderer/
     render_worker.py RenderWorker -- parses Markdown off the GUI thread
@@ -37,13 +38,17 @@ block's top margin (reserving the band) and drawing into it in `paintEvent`;
 this mirrors VNote's `TextDocumentLayout` intent without a custom document
 layout. Toggle it from the **View → In-place Preview** menu.
 
+Fenced code is painted token by token with Pygments runs computed on the render
+worker, and tables size their columns from their content (bold headers,
+ellipsis for cells that still do not fit) instead of splitting the band evenly.
+
 The full decision record (why a single pane, why `QTextEdit`, why block margins
 instead of a custom layout, preview scope and limitations) is in
 [`DESIGN.md`](DESIGN.md).
 
 ### Why it is fast
-* The Markdown parse (`markdown-it-py`) runs in a `QThreadPool` worker, never on
-  the GUI thread.
+* The Markdown parse (VNote's cmark, via `cmarkgfm`) runs in a `QThreadPool`
+  worker, never on the GUI thread.
 * `RenderManager.request` is **debounced and coalesced**: a burst of keystrokes
   collapses into a single render, and only the newest request can produce UI
   output (stale in-flight workers abandon their second phase).
@@ -60,11 +65,11 @@ instead of a custom layout, preview scope and limitations) is in
 | Concern        | VNote (`vtextedit`)        | mtextedit                         |
 |----------------|----------------------------|-----------------------------------|
 | Editor widget  | `QTextEdit`/`QPlainTextEdit` | `QTextEdit`                      |
-| Parser         | cmark (C)                  | `markdown-it-py` (Python)         |
+| Parser         | cmark (C)                  | cmark (VNote fork, C)             |
 | Code highlight | KSyntaxHighlighting (C++)   | Pygments (Python)                 |
 | Preview        | `QWebEngineView` (Chromium) | in-place, above the source block  |
 | Render thread  | `QtConcurrent`             | `QThreadPool` + coalesced manager |
-| Outline source | cmark AST                  | `markdown-it-py` AST              |
+| Outline source | cmark AST                  | cmark AST (VNote fork)            |
 | Search         | none / ripgrep             | notebook-wide search (in marktux) |
 
 > There is no bundled C++ highlighting engine: the KSyntaxHighlighting fork was

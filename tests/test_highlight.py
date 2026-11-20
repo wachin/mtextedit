@@ -22,13 +22,13 @@ from PyQt6.QtCore import QRectF
 from PyQt6.QtGui import QColor, QFont, QImage, QPainter, QTextDocument
 from PyQt6.QtWidgets import QApplication
 
-from mtextedit._markdown import build_document, build_md
+from mtextedit import mdparse
+from mtextedit._markdown import build_document
 from mtextedit.code_style import CODE_TEXT, CONSTANT, KEYWORD, STRING
 from mtextedit.highlight import (
     MAX_HIGHLIGHT_CHARS,
     _expand_tabs,
     _merge,
-    annotate_code_runs,
     code_runs,
 )
 from mtextedit.inplace import PreviewSpec, _paint_code, build_specs, measure_specs
@@ -85,16 +85,14 @@ class CodeRunsTest(unittest.TestCase):
 
 class AnnotationTest(unittest.TestCase):
     def test_build_specs_carries_the_runs(self):
-        tokens = build_md().parse("```python\nx = 1\n```\n")
-        annotate_code_runs(tokens)
+        tokens = mdparse.parse_tokens("```python\nx = 1\n```\n")
         specs = build_specs(tokens)
         self.assertEqual(len(specs), 1)
         self.assertEqual(specs[0].kind, "code")
         self.assertEqual(specs[0].data["highlight"], code_runs("x = 1\n", "python"))
 
     def test_indented_block_is_not_annotated(self):
-        tokens = build_md().parse("    x = 1\n")
-        annotate_code_runs(tokens)
+        tokens = mdparse.parse_tokens("    x = 1\n")
         self.assertFalse(any(tok.meta.get("highlight") for tok in tokens))
 
 
@@ -105,7 +103,7 @@ class WorkerTest(unittest.TestCase):
 
     def test_worker_annotates_tokens_before_emitting(self):
         captured = []
-        worker = RenderWorker(1, "```python\nx = 1\n```\n", build_md(), [1])
+        worker = RenderWorker(1, "```python\nx = 1\n```\n", [1])
         worker.signals.done.connect(lambda *args: captured.append(args))
         worker.run()
 
@@ -171,9 +169,10 @@ class DocumentBuilderTest(unittest.TestCase):
 
     @staticmethod
     def _document(source: str, annotate: bool = True) -> QTextDocument:
-        tokens = build_md().parse(source)
-        if annotate:
-            annotate_code_runs(tokens)
+        tokens = mdparse.parse_tokens(source)
+        if not annotate:
+            for token in tokens:
+                token.meta.clear()
         doc = QTextDocument()
         build_document(tokens, doc)
         return doc

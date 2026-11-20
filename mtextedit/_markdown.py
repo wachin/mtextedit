@@ -1,86 +1,25 @@
-"""Shared Markdown processing for mtextedit.
+"""Token consumers shared by the editor, renderer and outline.
 
-This module owns the single Markdown parser configuration used across the
-editor, the async renderer, the highlighter and the outline. It deliberately
-keeps *no* Qt dependencies in the pure-parsing helpers (``build_md``,
-``extract_headings``, ``collect_block_regions``) so they can run on a worker
-thread without a GUI context. The Qt-dependent builder (``build_document``)
-is only ever called on the GUI thread.
+Parsing itself lives in :mod:`mtextedit.mdparse` (VNote's cmark); this module
+turns that token stream into the three shapes the editor needs and keeps *no*
+Qt dependencies in ``extract_headings`` / ``collect_block_regions`` so they can
+run on a worker thread. The Qt-dependent ``build_document`` is only called on
+the GUI thread.
 
 Design notes
 ------------
-* Parser: ``markdown-it-py`` (pure Python, GFM flavour). It both renders HTML
-  and exposes a token stream we reuse for the outline and for editor
-  highlighting -- mirroring how VNote derived its outline from the cmark AST
-  rather than regex-scanning the source.
-* Code blocks: highlighted with Pygments, sharing ``code_style.GitHubLightStyle``
-  across every preview. The colour runs are computed on the render worker
-  (``highlight.annotate_code_runs``) and travel on the token stream, so the GUI
-  thread never runs a lexer; the in-place card and this module's full-document
-  ``QTextDocument`` builder both paint those same runs.
+* Code blocks are highlighted with Pygments, sharing
+  ``code_style.GitHubLightStyle``. The colour runs are computed while the tokens
+  are built (on the worker) and travel in ``token.meta["highlight"]``, so the
+  GUI thread never runs a lexer.
 * The native preview (``build_document``) replaces VNote's full-document
-  ``QWebEngineView.setHtml`` reload. We build a ``QTextDocument`` directly
-  from the token stream, which keeps the heavy parse on a worker thread and
-  avoids spinning up Chromium for every keystroke.
+  ``QWebEngineView.setHtml`` reload: we assemble a ``QTextDocument`` from the
+  token stream, so nothing spins up Chromium per keystroke.
 """
 
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
-
-from markdown_it import MarkdownIt
-
-# ---------------------------------------------------------------------------
-# Parser configuration
-# ---------------------------------------------------------------------------
-
-_MD: Optional[MarkdownIt] = None
-
-
-def build_md() -> MarkdownIt:
-    """Return the shared, fully-configured Markdown parser.
-
-    The parser is created lazily and reused. It is *not* thread-safe to mutate
-    its configuration after creation, so callers must treat the returned object
-    as read-only (use it only to parse/render).
-    """
-    global _MD
-    if _MD is None:
-        _MD = MarkdownIt("gfm-like").enable("table")
-        # Render fenced code blocks through Pygments for the HTML path.
-        _MD.add_render_rule("fence", _render_fence_pygments)
-    return _MD
-
-
-def _render_fence_pygments(self, tokens, idx, options, env):
-    token = tokens[idx]
-    lang = (token.info or "").strip().split()[0] if token.info else ""
-    text = token.content or ""
-    try:
-        from pygments import highlight
-        from pygments.formatters import HtmlFormatter
-        from pygments.lexers import get_lexer_by_name, guess_lexer
-
-        from .code_style import GitHubLightStyle
-
-        try:
-            lexer = get_lexer_by_name(lang, stripall=False)
-        except Exception:
-            lexer = guess_lexer(text)
-        highlighted = highlight(
-            text, lexer, HtmlFormatter(nowrap=True, style=GitHubLightStyle))
-        classes = f"language-{lang}" if lang else ""
-        return (
-            f'<pre class="code-block {classes}"><code>{highlighted}</code></pre>\n'
-        )
-    except Exception:
-        esc = (
-            text.replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;")
-        )
-        return f'<pre class="code-block"><code>{esc}</code></pre>\n'
-
 
 # ---------------------------------------------------------------------------
 # Heading extraction (outline source of truth)
@@ -139,16 +78,6 @@ def collect_block_regions(tokens: List[Any]) -> List[Region]:
         elif tok.type == "hr":
             regions.append({"start": start, "end": end, "kind": "hr"})
     return regions
-
-
-# ---------------------------------------------------------------------------
-# HTML rendering (used by the optional QWebEngineView preview)
-# ---------------------------------------------------------------------------
-
-def render_html(md: MarkdownIt, tokens: List[Any]) -> str:
-    """Render previously-parsed tokens to a full HTML string."""
-    # Reuse markdown-it's renderer on the token stream.
-    return md.renderer.render(tokens, md.options, {})
 
 
 # ---------------------------------------------------------------------------
@@ -256,7 +185,7 @@ class _DocBuilder:
         bf.setTopMargin(4)
         bf.setBottomMargin(4)
         self._new_block(bf=bf, cf=cf)
-        # Runs are computed by the render worker (highlight.annotate_code_runs)
+        # Runs are computed while the token stream is built (mdparse)
         # and travel on the token stream; without them the block stays flat.
         runs = (tok.meta or {}).get("highlight") or []
         if not runs:

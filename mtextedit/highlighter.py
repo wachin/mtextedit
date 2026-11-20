@@ -6,7 +6,7 @@ The highlighter styles two layers:
    from the async render pipeline. The render manager emits ``structureAvailable``
    with line-range regions produced by
    :func:`mtextedit._markdown.collect_block_regions`; the highlighter caches
-   them and re-highlights. This keeps the markdown-it parse *off* the GUI thread
+   them and re-highlights. This keeps the Markdown parse *off* the GUI thread
    (VNote did the same parse on a worker for highlighting).
 2. *Inline* emphasis (``**bold**``, ``*italic*``, `` `code` ``, ``[link](u)``)
    is computed per-block with lightweight regex on the GUI thread -- cheap

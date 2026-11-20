@@ -1,9 +1,9 @@
 """Pygments token runs for fenced code (computed off the GUI thread).
 
 The in-place preview paints code into its own band, so it needs colours as plain
-data: for each source line, a list of ``(text, "#rrggbb")`` runs. Building them
-here keeps Pygments on the render worker (D12) and keeps the payload free of Qt
-types, so it can cross the queued signal safely.
+data: for each source line, a list of ``(text, "#rrggbb")`` runs. They are built
+while the token stream is produced (``mdparse``), off the GUI thread (D12), and
+are free of Qt types.
 
 Indented ``code_block`` blocks carry no language and unknown languages are not
 guessed: both return no runs, and the preview falls back to flat monospace text.
@@ -111,20 +111,3 @@ def code_runs(code: str, lang: str) -> list[LineRuns]:
     if len(lines) > 1 and not lines[-1]:
         lines.pop()
     return [_expand_tabs(line) for line in lines]
-
-
-def annotate_code_runs(tokens) -> None:
-    """Attach ``token.meta["highlight"]`` to every highlighted code block.
-
-    Runs on the render worker, before the token stream is emitted, so the GUI
-    thread never calls Pygments (rule 5 / D12).
-    """
-    for token in tokens:
-        if token.type not in ("fence", "code_block"):
-            continue
-        lang = ""
-        if token.type == "fence" and token.info:
-            lang = token.info.strip().split()[0]
-        runs = code_runs(token.content or "", lang)
-        if runs:
-            token.meta["highlight"] = runs

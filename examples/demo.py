@@ -60,7 +60,7 @@ def greet(name: str) -> str:
 | Feature | VNote | marktux |
 |---------|-------|---------|
 | Preview | WebEngine | native |
-| Parse   | cmark  | markdown-it-py |
+| Parse   | cmark  | cmark (VNote fork) |
 | Search  | none   | content search |
 
 > Note: headings, code blocks, lists, quotes and tables all come from the

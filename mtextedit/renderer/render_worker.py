@@ -1,4 +1,4 @@
-"""Worker that parses Markdown off the GUI thread.
+"""Worker that parses Markdown off the GUI thread with VNote's cmark.
 
 A ``RenderWorker`` is a ``QRunnable`` so it runs on ``QThreadPool``. It parses
 the source into a token stream and derives everything the UI needs in *one*
@@ -33,7 +33,6 @@ class RenderWorker(QRunnable):
         self,
         revision: int,
         source: str,
-        md,
         gen_token: List[int],
         base_path: Optional[str] = None,
         cached_images: Optional[Set[Tuple[str, float]]] = None,
@@ -41,7 +40,6 @@ class RenderWorker(QRunnable):
         super().__init__()
         self.revision = revision
         self.source = source
-        self.md = md
         self.gen_token = gen_token  # mutable one-element list owned by the manager
         self.base_path = base_path
         self.cached_images = cached_images or set()
@@ -52,22 +50,19 @@ class RenderWorker(QRunnable):
 
     def run(self):
         # Cheap first phase: parse + headings/regions (outline shows immediately).
-        tokens = self.md.parse(self.source)
+        from ..mdparse import parse_tokens
+        tokens = parse_tokens(self.source)
 
         from .._markdown import extract_headings, collect_block_regions
-        from ..highlight import annotate_code_runs
         headings = extract_headings(tokens)
         regions = collect_block_regions(tokens)
-        # Pygments runs for fenced code stay on this thread; the token stream
-        # carries them to the GUI as plain strings (D12).
-        annotate_code_runs(tokens)
 
         # Priority-cancel point: a newer keystroke may have arrived.
         if self._stale():
             return
 
-        from .._markdown import render_html
-        html = render_html(self.md, tokens)
+        from ..mdparse import render_html
+        html = render_html(self.source)
 
         if self._stale():
             return

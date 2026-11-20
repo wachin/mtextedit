@@ -90,20 +90,25 @@ need networking. VNote's in-place preview likewise keeps regular text as source
 
 **Consequences.** This is not Obsidian-style Live Preview. Inline markers such as
 `**` and `*` stay visible. Extending to inline rendering is a documented future
-step, not a defect.
+step, not a defect. Within that scope, fenced code is token-coloured (D8) and
+table columns are sized from their content — proportional widths, a floor for
+narrow columns, bold headers — with ellipsis for cells that still overflow.
 
 ---
 
-## D6. One `markdown-it-py` parse feeds everything
+## D6. One cmark parse feeds everything
 
-**Decision.** A single parse produces the token stream, which is reused for the
-outline headings, the editor's block-highlight regions, and the in-place preview
-specs.
+**Decision.** A single parse with VNote's cmark (`libs/cmarkgfm`) produces the
+intermediate representation and a compact token stream, and both feed the outline
+headings, the editor's block regions, the in-place preview specs and the
+full-document preview. There is no second parser and no fallback:
+`markdown-it-py` was removed.
 
-**Rationale.** Mirrors VNote deriving its outline from the cmark AST. One parse
-avoids three divergent interpretations of the same document. `markdown-it-py`
-tokens carry `map` (source line ranges), which map directly to `QTextBlock`
-numbers.
+**Rationale.** Mirrors VNote deriving its outline from the cmark AST, and keeps a
+single interpretation of the document. cmark reports source lines and, with
+`CMARK_OPT_SOURCE_SYNTAX`, the exact delimiter spans; its line ranges map
+directly to `QTextBlock` numbers. On a 3,000-line fixture the cmark path is about
+2.6 times faster than the previous pure-Python parser.
 
 ---
 
@@ -265,6 +270,35 @@ in-place preview paints fenced code token by token using this style, with flat
 monospace as the fallback for unknown languages, indented blocks and oversized
 fences. The palette lives in a normal Python module, so no build step, submodule
 or C++ toolchain is needed to keep or extend it.
+
+---
+
+## D15. VNote's cmark is the parser; parsing yields a small IR
+
+**Decision.** `mtextedit.mdparse` parses the document with VNote's cmark fork
+(`libs/cmarkgfm`, pinned to `vnotex/cmark` 0.31.2) into a Qt-free IR: block
+ranges plus inline spans in absolute character offsets. Inline spans come from
+the parser's own source metadata (`CMARK_OPT_SOURCE_SYNTAX`), including the
+exact delimiter positions. The binding is required: if it is missing or the build is broken,
+`parse`/`parse_tokens` raise a clear `RuntimeError` instead of silently
+switching parsers.
+
+**Why.** It is the same parser VNote uses, so node extents match; the previous
+pure-Python parser carried positions only on blocks, which is why inline styling
+fell back to regexes. Measured on a 3,000-line fixture: **54 ms** for the cmark
+IR versus **141 ms** for that parser. The IR contains no Qt types, so it is safe
+to build on the render worker. The same parse also produces the compact token
+stream `_markdown`/`inplace` consume, so removing markdown-it needed no rewrite
+of those consumers.
+
+**Consequences.** cmark columns are 1-based UTF-8 byte offsets, converted to
+character offsets once per line by `SourceMap`; tests cover accented and emoji
+text. A source checkout prefers the built fork under `libs/cmarkgfm/src`, while
+an installed package uses its declared dependency (the pinned `cmarkgfm` fork).
+There is no fallback path. The
+highlighter (exact spans instead of regexes) and cursor-aware marker
+concealment are the next consumers; until they are wired, the existing
+region/regex highlighting stays in place.
 
 ---
 

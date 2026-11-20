@@ -27,7 +27,6 @@ from typing import List, Optional, Set, Tuple
 from PyQt6.QtCore import pyqtSignal, QObject, QThreadPool, QTimer
 
 from .render_worker import RenderWorker
-from .._markdown import build_md
 
 _IMAGE_CACHE_MAX = 32
 
@@ -50,7 +49,6 @@ class RenderManager(QObject):
     def __init__(self, parent: QObject = None, render_delay_ms: int = 120,
                  max_threads: int = 2, image_cache_max: int = _IMAGE_CACHE_MAX):
         super().__init__(parent)
-        self._md = build_md()
         self._pool = QThreadPool.globalInstance()
         self._pool.setMaxThreadCount(max_threads)
         self._gen: List[int] = [0]
@@ -95,7 +93,6 @@ class RenderManager(QObject):
         worker = RenderWorker(
             self._pending_rev,
             self._latest_source,
-            self._md,
             self._gen,
             base_path=self._base_path,
             cached_images=set(self._image_cache.keys()),
