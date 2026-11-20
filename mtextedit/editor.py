@@ -20,7 +20,7 @@ import os
 from typing import List, Optional
 
 from PyQt6.QtCore import QRectF, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QPainter, QTextCursor
+from PyQt6.QtGui import QImage, QPainter, QTextCursor
 from PyQt6.QtWidgets import QTextEdit
 
 from . import inplace
@@ -216,12 +216,34 @@ class MTextEdit(QTextEdit):
         self._image_paster = callback
 
     def insertFromMimeData(self, source):
-        if self._image_paster is not None and source.hasImage():
-            image = source.imageData()
-            path = self._image_paster(image) if image is not None else None
-            if path:
-                self.textCursor().insertText(f"![]({path})")
-                return
+        if self._image_paster is not None:
+            if source.hasImage():
+                image = source.imageData()
+                path = (self._image_paster(image)
+                        if image is not None else None)
+                if path:
+                    self.textCursor().insertText(f"![]({path})")
+                    return
+            if source.hasUrls():
+                inserted = False
+                for url in source.urls():
+                    if not url.isLocalFile():
+                        continue
+                    local = url.toLocalFile()
+                    image = QImage(local)
+                    if image.isNull():
+                        continue
+                    path = self._image_paster(image)
+                    if not path:
+                        continue
+                    alt = os.path.splitext(os.path.basename(local))[0]
+                    cursor = self.textCursor()
+                    if inserted:
+                        cursor.insertText("\n")
+                    cursor.insertText(f"![{alt}]({path})")
+                    inserted = True
+                if inserted:
+                    return
         super().insertFromMimeData(source)
 
     def goToLine(self, line: int):

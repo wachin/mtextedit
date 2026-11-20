@@ -150,6 +150,13 @@ Both `examples/demo.py` and `marktux/main.py` expose these under a **Tools** men
 Each shortcut wraps or unwraps the selection, and works on an empty caret by
 inserting the pair and placing the cursor inside it.
 
+## Images
+
+Pasted images and dropped local image files both go through
+`MTextEdit.set_image_paster(callback)`: the host stores the asset and returns the
+note-relative path. Dropped files use the file stem as alt text. Without a
+callback, Qt's default paste/drop behaviour is kept.
+
 ## Tests
 
 ```bash

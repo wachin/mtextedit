@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -18,7 +19,7 @@ _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from PyQt6.QtCore import QMimeData
+from PyQt6.QtCore import QMimeData, QUrl
 from PyQt6.QtGui import QImage
 from PyQt6.QtWidgets import QApplication
 
@@ -54,6 +55,28 @@ class ImagePasteTest(unittest.TestCase):
         editor.set_image_paster(lambda image: None)
         mime = QMimeData()
         mime.setImageData(QImage(4, 4, QImage.Format.Format_RGB32))
+        editor.insertFromMimeData(mime)
+        self.assertNotIn("![](", editor.toPlainText())
+
+    def test_dropped_image_file_inserts_markdown_with_alt_text(self):
+        editor = MTextEdit()
+        seen: list[QImage] = []
+        editor.set_image_paster(
+            lambda image: seen.append(image) or "assets/photo.png")
+        directory = tempfile.mkdtemp()
+        path = Path(directory) / "photo.png"
+        self.assertTrue(QImage(4, 4, QImage.Format.Format_RGB32).save(str(path)))
+        mime = QMimeData()
+        mime.setUrls([QUrl.fromLocalFile(str(path))])
+        editor.insertFromMimeData(mime)
+        self.assertEqual(editor.toPlainText(), "![photo](assets/photo.png)")
+        self.assertEqual(len(seen), 1)
+
+    def test_dropped_non_image_url_falls_back_to_qt(self):
+        editor = MTextEdit()
+        editor.set_image_paster(lambda image: "unused")
+        mime = QMimeData()
+        mime.setUrls([QUrl.fromLocalFile("/nonexistent/notes.txt")])
         editor.insertFromMimeData(mime)
         self.assertNotIn("![](", editor.toPlainText())
 
