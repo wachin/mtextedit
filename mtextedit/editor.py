@@ -65,6 +65,7 @@ class MTextEdit(QTextEdit):
         self._manager = None
         self._images: dict = {}  # abs_path -> QImage decoded off-thread (D13)
         self._image_paster = None  # host hook: (QImage) -> markdown path | None
+        self._ask_image_details = False
 
     # -- render wiring -------------------------------------------------------
     def _on_text_changed(self):
@@ -215,14 +216,40 @@ class MTextEdit(QTextEdit):
         """
         self._image_paster = callback
 
+    def set_image_dialog_enabled(self, enabled: bool) -> None:
+        """Ask for alt text and title before inserting an image."""
+        self._ask_image_details = bool(enabled)
+
+    def _image_details(self, image, suggested_alt: str):
+        if not self._ask_image_details:
+            return suggested_alt, ""
+        from .image_dialog import ImageInsertDialog
+
+        dialog = ImageInsertDialog(image, suggested_alt, self)
+        if dialog.exec() != ImageInsertDialog.DialogCode.Accepted:
+            return None
+        return dialog.values()
+
+    def _insert_image(self, image, suggested_alt: str = "",
+                      prefix: str = "") -> bool:
+        details = self._image_details(image, suggested_alt)
+        if details is None:
+            return True  # the user cancelled: consume the gesture
+        alt, title = details
+        path = self._image_paster(image)
+        if not path:
+            return False
+        from .image_dialog import image_markdown
+
+        self.textCursor().insertText(
+            prefix + image_markdown(path, alt, title))
+        return True
+
     def insertFromMimeData(self, source):
         if self._image_paster is not None:
             if source.hasImage():
                 image = source.imageData()
-                path = (self._image_paster(image)
-                        if image is not None else None)
-                if path:
-                    self.textCursor().insertText(f"![]({path})")
+                if image is not None and self._insert_image(image):
                     return
             if source.hasUrls():
                 inserted = False
@@ -233,15 +260,10 @@ class MTextEdit(QTextEdit):
                     image = QImage(local)
                     if image.isNull():
                         continue
-                    path = self._image_paster(image)
-                    if not path:
-                        continue
                     alt = os.path.splitext(os.path.basename(local))[0]
-                    cursor = self.textCursor()
-                    if inserted:
-                        cursor.insertText("\n")
-                    cursor.insertText(f"![{alt}]({path})")
-                    inserted = True
+                    if self._insert_image(
+                            image, alt, "\n" if inserted else ""):
+                        inserted = True
                 if inserted:
                     return
         super().insertFromMimeData(source)

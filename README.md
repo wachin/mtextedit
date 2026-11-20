@@ -154,8 +154,11 @@ inserting the pair and placing the cursor inside it.
 
 Pasted images and dropped local image files both go through
 `MTextEdit.set_image_paster(callback)`: the host stores the asset and returns the
-note-relative path. Dropped files use the file stem as alt text. Without a
-callback, Qt's default paste/drop behaviour is kept.
+note-relative path. Dropped files use the file stem as alt text. With
+`set_image_dialog_enabled(True)` (MarkTux enables it) a small dialog asks for
+alternative text and title before the host stores the image; paths containing
+spaces are wrapped in angle brackets. Without a callback, Qt's default
+paste/drop behaviour is kept.
 
 ## Tests
 
