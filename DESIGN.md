@@ -123,14 +123,17 @@ answer to VNote's per-keystroke full re-render.
 
 ---
 
-## D8. Pygments for code; the KSyntaxHighlighting fork is unused
+## D8. Pygments for code; no C++ highlighting engine
 
 **Decision.** Code blocks are highlighted with Pygments (HTML path) and rendered
-monospace in the native preview. The vendored C++ `syntax-highlighting`
-(KSyntaxHighlighting) fork is **not** used by the Python code.
+monospace in the native preview, using `mtextedit.code_style.GitHubLightStyle`.
+No C++ highlighting engine is built, bound or vendored.
 
 **Rationale.** KSyntaxHighlighting is C++/Qt and not importable from Python.
-Pygments is pure Python and already a dependency.
+Pygments is pure Python and already a dependency, and it covers more languages
+(589 lexers versus 429 Kate definitions). The KSyntaxHighlighting fork that used
+to be vendored has been removed; only its MIT-licensed GitHub Light palette
+survived (D14).
 
 ---
 
@@ -234,9 +237,34 @@ reuses the manager's debounce/coalesce/cancel machinery.
 
 ---
 
+## D14. The C++ fork was removed; its GitHub Light palette was kept
+
+**Decision.** `libs/mtextedit/libs/syntax-highlighting` — a 10k-line C++
+KSyntaxHighlighting fork with a 53 MB checkout — was deleted. The one artefact
+kept is the palette of its MIT-licensed `github-light.theme`, re-expressed as
+`mtextedit.code_style.GitHubLightStyle` plus the `CODE_*` constants that
+`inplace.py` paints the code card with.
+
+**Rationale.** Porting or binding the engine would duplicate Pygments (D8) and
+add a C++/Qt build dependency; it could not even configure on the development
+machine, because it requires Qt 6.9 while the platform ships 6.8.2. The palette,
+by contrast, has no Python equivalent: Pygments ships `github-dark` but no
+GitHub Light style, and the preview already drew its code card in GitHub's light
+colours (`#f6f8fa` on `#d0d7de`). Colour values are GitHub Inc.'s (MIT); the
+mapping onto Pygments token types is ours.
+
+**Consequences.** The editor has exactly one highlighter (Pygments). Fenced code
+in the in-place preview still paints flat text; colouring it token-by-token is a
+separate, smaller change that now has a ready style to paint with. The palette
+lives in a normal Python module, so no build step, submodule or C++ toolchain is
+needed to keep or extend it.
+
+---
+
 ## Non-goals
 
 * Porting `vxcore`, `m3` or `QHotkey` C++ code. The app-level data model is
-  reimplemented in Python (`core/`), with an FTS5 index VNote lacked.
+  reimplemented in Python (`core/`), with pluggable content search (the
+  application's `DESIGN.md`, C9).
 * Full WYSIWYG inline rendering and math preview (future work).
 * Chromium as a default dependency.

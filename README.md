@@ -15,6 +15,7 @@ mtextedit/
   editor.py          MTextEdit -- QTextEdit surface with in-place preview
   inplace.py         code/table/image previews drawn above their source block
   highlighter.py     MarkdownHighlighter -- block regions (async) + inline regex
+  code_style.py      GitHubLightStyle -- Pygments palette for fenced code
   renderer/
     render_worker.py RenderWorker -- parses Markdown off the GUI thread
     render_manager.py RenderManager -- debounce + coalesce + priority cancel
@@ -63,10 +64,12 @@ instead of a custom layout, preview scope and limitations) is in
 | Preview        | `QWebEngineView` (Chromium) | in-place, above the source block  |
 | Render thread  | `QtConcurrent`             | `QThreadPool` + coalesced manager |
 | Outline source | cmark AST                  | `markdown-it-py` AST              |
-| Search         | none / ripgrep             | notebook-wide FTS5 (in marktux)   |
+| Search         | none / ripgrep             | notebook-wide search (in marktux) |
 
-> The bundled `libs/syntax-highlighting` (a C++ KSyntaxHighlighting fork) is **not
-> used** by the Python code; code blocks are highlighted with Pygments instead.
+> There is no bundled C++ highlighting engine: the KSyntaxHighlighting fork was
+> removed, and code blocks are highlighted with Pygments. Its MIT-licensed
+> GitHub Light palette survives as `mtextedit.code_style.GitHubLightStyle`, the
+> style the preview paints code with (see `DESIGN.md` D14).
 
 ## Usage
 

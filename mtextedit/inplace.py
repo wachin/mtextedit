@@ -27,13 +27,15 @@ from PyQt6.QtGui import (
     QPixmap,
 )
 
+from .code_style import CODE_BG, CODE_BORDER, CODE_TEXT
+
 _PAD = 8
 _TITLE_H = 16
 _ROW_H = 24
 _MAX_H = 420
-_CODE_BG = QColor("#f6f8fa")
-_CODE_BORDER = QColor("#d0d7de")
-_CODE_FG = QColor("#24292f")
+_CODE_BG = QColor(CODE_BG)
+_CODE_BORDER = QColor(CODE_BORDER)
+_CODE_FG = QColor(CODE_TEXT)
 _HEAD_BG = QColor("#eaeef2")
 _GRID = QColor("#d0d7de")
 _TEXT = QColor("#24292f")

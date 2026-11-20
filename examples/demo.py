@@ -61,7 +61,7 @@ def greet(name: str) -> str:
 |---------|-------|---------|
 | Preview | WebEngine | native |
 | Parse   | cmark  | markdown-it-py |
-| Search  | none   | FTS5 |
+| Search  | none   | content search |
 
 > Note: headings, code blocks, lists, quotes and tables all come from the
 > single token stream produced by the render worker.

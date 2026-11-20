@@ -12,8 +12,10 @@ Public surface
   and the Chromium-free preview.
 * :class:`OutlineView` / :class:`OutlineModel` -- AST-derived outline.
 * :class:`FindReplaceWidget` -- in-file find & replace.
+* :class:`GitHubLightStyle` -- Pygments style for fenced code blocks.
 """
 
+from .code_style import GitHubLightStyle
 from .editor import MTextEdit
 from .highlighter import MarkdownHighlighter
 from .outline import OutlineModel, OutlineView
@@ -31,5 +33,6 @@ __all__ = [
     "RenderManager",
     "RenderWorker",
     "PreviewWidget",
+    "GitHubLightStyle",
     "__version__",
 ]
