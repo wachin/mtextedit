@@ -36,8 +36,7 @@ class GoldenDocumentTest(unittest.TestCase):
         cls.text = FIXTURE.read_text(encoding="utf-8")
         cls.parsed = mdparse.parse_document(cls.text)
         cls.cmark = mdparse.require_cmark()
-        cls.html = mdparse.render_html(
-            cls.text, cls.cmark.Options.CMARK_OPT_TASKLISTS)
+        cls.html = mdparse.render_html(cls.text)
 
     def test_parser_keeps_every_section(self):
         kinds = Counter(token.type for token in self.parsed.tokens)
@@ -55,6 +54,10 @@ class GoldenDocumentTest(unittest.TestCase):
         self.assertEqual(styles["link"], 18)
         self.assertEqual(styles["image"], 14)
         self.assertEqual(styles["math"], 17)
+
+    def test_html_matches_the_stored_snapshot(self):
+        snapshot = FIXTURE.with_suffix(".html").read_text(encoding="utf-8")
+        self.assertEqual(self.html, snapshot)
 
     def test_html_renders_the_gfm_structures(self):
         self.assertEqual(self.html.count("<table"), 12)

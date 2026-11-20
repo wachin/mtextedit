@@ -1,0 +1,992 @@
+<h1>MDHoriZon — Golden Test Document</h1>
+<p>This document is the permanent rendering fixture for MDHoriZon.</p>
+<p>It is intentionally broad. It is not intended to be beautiful content; it is intended to expose rendering regressions.</p>
+<hr />
+<h1>1. Headings</h1>
+<h2>Heading level 2</h2>
+<h3>Heading level 3</h3>
+<h4>Heading level 4</h4>
+<h5>Heading level 5</h5>
+<h6>Heading level 6</h6>
+<p>ATX headings may also be closed:</p>
+<h2>Closed heading with trailing hashes</h2>
+<p>Setext headings use an underline instead of a leading hash:</p>
+<h1>Heading level 1 (setext)</h1>
+<h2>Heading level 2 (setext)</h2>
+<p>Inline markup inside a heading must render without breaking the heading itself:</p>
+<h2>Heading with <strong>bold</strong>, <em>italic</em> and <code>code</code></h2>
+<p>Duplicate headings must receive deterministic and distinct anchor IDs, so that links to either one remain stable:</p>
+<h2>Duplicate heading</h2>
+<h2>Duplicate heading</h2>
+<hr />
+<h1>2. Paragraphs and Inline Formatting</h1>
+<p>This is a normal paragraph with <strong>bold text</strong>, <em>italic text</em>, <em><strong>bold italic text</strong></em>, and <s>strikethrough</s>.</p>
+<p>Here is <code>inline code</code>, an escaped character *that should not become italic*, and special characters:</p>
+<p><code>&amp; &lt; &gt; &quot; ' © ® ™ € £ ¥</code></p>
+<hr />
+<h1>3. Links</h1>
+<ul>
+<li>External link: <a href="https://github.com/">GitHub</a></li>
+<li>Relative link: <a href="../articles/example.md">Another article</a></li>
+<li>Anchor link: <a href="#12-mermaid">Go to Mermaid</a></li>
+<li>Email-style text: <code>example@example.com</code></li>
+</ul>
+<p>GFM autolinks — bare URLs, <code>www.</code> hosts and angle-bracketed URLs must all become links:</p>
+<ul>
+<li>Bare URL: https://example.com/path?query=1#fragment</li>
+<li>Bare www host: www.example.com</li>
+<li>Angle-bracketed URL: <a href="https://example.com/">https://example.com/</a></li>
+<li>Angle-bracketed e-mail: <a href="mailto:example@example.com">example@example.com</a></li>
+</ul>
+<p>Reference-style links, with the definition placed later in this document:</p>
+<ul>
+<li>Full reference: <a href="https://github.com/wachin/MDHoriZon" title="MDHoriZon on GitHub">MDHoriZon repository</a></li>
+<li>Collapsed reference: <a href="https://github.com/wachin/MDHoriZon" title="MDHoriZon on GitHub">repo-ref</a></li>
+<li>Shortcut reference: <a href="https://github.com/wachin/MDHoriZon" title="MDHoriZon on GitHub">repo-ref</a></li>
+</ul>
+<p>A link with a title attribute (the title must survive into the rendered <code>title</code>):</p>
+<p><a href="https://github.com/" title="GitHub home page">GitHub with title</a></p>
+<p>Line breaks. The two lines below are separated by a soft line break; the second pair is separated by two
+trailing spaces, which must produce a hard line break.</p>
+<p>Soft
+break</p>
+<p>Hard<br />
+break</p>
+<p>A backslash at the end of a line must also produce a hard line break:<br />
+this text starts on a new line.</p>
+<hr />
+<h1>4. Images</h1>
+<p>Remote image example. This requires network access; with no network it must fail exactly as gracefully as the
+missing-image case below:</p>
+<p><img src="https://placehold.co/640x240/0b3d91/ffffff/png?text=MDHoriZon" alt="MDHoriZon placeholder image" /></p>
+<p>Relative image example. The file exists at <code>tests/fixtures/images/example.png</code> and must resolve relative to this
+document, not relative to the application or the page URL:</p>
+<p><img src="images/example.png" alt="Relative image" /></p>
+<p>Redundant <code>./</code> and <code>..</code> segments must be normalized rather than treated as a literal path:</p>
+<p><img src="./images/example.png" alt="Relative image with redundant segments" /></p>
+<p>Image with a title attribute (the title must survive into the rendered <code>title</code>):</p>
+<p><img src="images/example.png" alt="Relative image with title" title="The relative fixture asset" /></p>
+<p>Decorative image with intentionally empty alt text. It must not be announced by assistive technology and must
+not produce a broken-image placeholder:</p>
+<p><img src="images/example.png" alt="" /></p>
+<p>Very wide image. It must stay inside the viewport, keep its aspect ratio, and scroll or shrink instead of
+stretching the layout:</p>
+<p><img src="images/wide.png" alt="Wide fixture asset" /></p>
+<p>Very tall image. It must not force the page to become unusable without scrolling:</p>
+<p><img src="images/tall.png" alt="Tall fixture asset" /></p>
+<p>Missing image example. <code>tests/fixtures/images/does-not-exist.png</code> <strong>intentionally does not exist</strong>; this is a negative
+test, not an unfinished task, and creating that file would delete this test case. Expected behavior: the
+article keeps rendering, the alt text stays available, and nothing throws.</p>
+<p><img src="images/does-not-exist.png" alt="This image intentionally does not exist" /></p>
+<p>Image used as a link:</p>
+<p><a href="https://github.com/"><img src="https://placehold.co/320x120/1e88e5/ffffff/png?text=Link" alt="Linked image" /></a></p>
+<p>Image inside a list item:</p>
+<ul>
+<li>List item with an image: <img src="images/example.png" alt="Inline icon" /></li>
+<li>Item after the image.</li>
+</ul>
+<p>Image inside a table cell:</p>
+<table>
+<thead>
+<tr>
+<th> Placement</th>
+<th> Image</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td> Table cell</td>
+<td> <img src="images/example.png" alt="Icon in a table" /></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1>5. Lists</h1>
+<h2>Unordered</h2>
+<ul>
+<li>First item</li>
+<li>Second item
+<ul>
+<li>Nested item</li>
+<li>Another nested item
+<ul>
+<li>Third level</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Final item</li>
+</ul>
+<h2>Ordered</h2>
+<ol>
+<li>First</li>
+<li>Second
+<ol>
+<li>Nested first</li>
+<li>Nested second</li>
+</ol>
+</li>
+<li>Third</li>
+</ol>
+<h2>Task list</h2>
+<ul class="contains-task-list">
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled="" checked="" /> Completed item</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled="" /> Pending item</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled="" /> Another pending item</li>
+</ul>
+<h2>Loose list (blank lines between items)</h2>
+<ul>
+<li>
+<p>First item, separated from the next by a blank line.</p>
+</li>
+<li>
+<p>Second item.</p>
+</li>
+<li>
+<p>Third item.</p>
+</li>
+</ul>
+<h2>List item containing multiple paragraphs</h2>
+<ol>
+<li>
+<p>First paragraph of the item.</p>
+<p>Second paragraph of the same item, which must stay inside the item rather than escaping into the document.</p>
+</li>
+<li>
+<p>Next item.</p>
+</li>
+</ol>
+<h2>Ordered list starting at a number other than 1</h2>
+<ol start="5">
+<li>Fifth</li>
+<li>Sixth</li>
+<li>Seventh</li>
+</ol>
+<p>The rendered list must preserve the starting number rather than silently renumbering from 1.</p>
+<h2>List item containing a fenced code block</h2>
+<ul>
+<li>
+<p>Item with code:</p>
+<pre><code class="language-bash">echo &quot;code inside a list item&quot;
+</code></pre>
+</li>
+<li>
+<p>Item after the code block.</p>
+</li>
+</ul>
+<h2>Mixed nested list</h2>
+<ul>
+<li>Unordered item
+<ol>
+<li>Ordered child
+<ul>
+<li>Unordered grandchild</li>
+</ul>
+</li>
+<li>Second ordered child</li>
+</ol>
+</li>
+<li>Final unordered item</li>
+</ul>
+<hr />
+<h1>6. Blockquotes</h1>
+<blockquote>
+<p>This is a blockquote.</p>
+<p>It contains multiple paragraphs.</p>
+</blockquote>
+<blockquote>
+<p>Nested example:</p>
+<blockquote>
+<p>Inner quotation.</p>
+</blockquote>
+</blockquote>
+<hr />
+<h1>7. Code Blocks</h1>
+<h2>Bash</h2>
+<pre><code class="language-bash">#!/usr/bin/env bash
+
+echo &quot;Hello from MDHoriZon&quot;
+printf 'Current directory: %s\n' &quot;$PWD&quot;
+</code></pre>
+<h2>Python</h2>
+<pre><code class="language-python">from pathlib import Path
+
+root = Path(&quot;.&quot;)
+for path in root.rglob(&quot;*.md&quot;):
+    print(path)
+</code></pre>
+<h2>JavaScript</h2>
+<pre><code class="language-javascript">const message = &quot;Hello, MDHoriZon!&quot;;
+console.log(message);
+</code></pre>
+<h2>TypeScript</h2>
+<pre><code class="language-typescript">interface Article {
+  title: string;
+  tags: string[];
+  offline: boolean;
+}
+
+const article: Article = {
+  title: &quot;Golden Test&quot;,
+  tags: [&quot;markdown&quot;, &quot;testing&quot;],
+  offline: true,
+};
+</code></pre>
+<h2>JSON</h2>
+<pre><code class="language-json">{
+  &quot;name&quot;: &quot;MDHoriZon&quot;,
+  &quot;offline&quot;: true,
+  &quot;features&quot;: [&quot;GFM&quot;, &quot;KaTeX&quot;, &quot;Mermaid&quot;]
+}
+</code></pre>
+<h2>HTML</h2>
+<pre><code class="language-html">&lt;article&gt;
+  &lt;h1&gt;Example&lt;/h1&gt;
+  &lt;p&gt;HTML should be handled according to the project's security policy.&lt;/p&gt;
+&lt;/article&gt;
+</code></pre>
+<h2>CSS</h2>
+<pre><code class="language-css">.article {
+  max-width: 72rem;
+  margin-inline: auto;
+  padding: 1rem;
+}
+</code></pre>
+<h2>Unknown language</h2>
+<pre><code class="language-not-a-real-language">This must still render as readable code.
+</code></pre>
+<h2>Long line</h2>
+<pre><code class="language-text">This is intentionally an extremely long line intended to verify horizontal scrolling rather than forcing the entire document or viewport to become unnecessarily wide on desktop or mobile devices.
+</code></pre>
+<h2>Unbroken long token</h2>
+<pre><code class="language-text">https://example.com/a/deliberately/long/unbroken/path/that/cannot/wrap/at/all/and/must/instead/scroll/horizontally/without/stretching/the/viewport/0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
+</code></pre>
+<h2>Plain text block with no language declared</h2>
+<pre><code>No language is declared for this fence, and it must still render as a readable code block.
+</code></pre>
+<h2>Empty code block</h2>
+<pre><code class="language-text"></code></pre>
+<h2>Indented code block (four spaces, no fence)</h2>
+<pre><code>indented code block, first line
+indented code block, second line
+</code></pre>
+<h2>Language alias and uppercase identifier</h2>
+<pre><code class="language-JS">console.log(&quot;Alias and uppercase language identifiers must not crash the highlighter&quot;)
+</code></pre>
+<hr />
+<h1>8. Tables</h1>
+<h2>Small table</h2>
+<table>
+<thead>
+<tr>
+<th> Name</th>
+<th> Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td> Markdown</td>
+<td> Content</td>
+</tr>
+<tr>
+<td> React</td>
+<td> UI</td>
+</tr>
+<tr>
+<td> Mermaid</td>
+<td> Diagram</td>
+</tr>
+</tbody>
+</table>
+<h2>Three columns</h2>
+<table>
+<thead>
+<tr>
+<th> Feature</th>
+<th style="text-align: right"> Web</th>
+<th style="text-align: right"> Mobile</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td> Markdown</td>
+<td style="text-align: right"> Yes</td>
+<td style="text-align: right"> Yes</td>
+</tr>
+<tr>
+<td> Offline</td>
+<td style="text-align: right"> Optional</td>
+<td style="text-align: right"> Yes</td>
+</tr>
+<tr>
+<td> Mermaid</td>
+<td style="text-align: right"> Yes</td>
+<td style="text-align: right"> Yes</td>
+</tr>
+</tbody>
+</table>
+<h2>Five columns</h2>
+<table>
+<thead>
+<tr>
+<th> Feature</th>
+<th> Web</th>
+<th> Mobile</th>
+<th> Offline</th>
+<th> Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td> Markdown</td>
+<td> Yes</td>
+<td> Yes</td>
+<td> Yes</td>
+<td> One core for every target</td>
+</tr>
+<tr>
+<td> Tables</td>
+<td> Yes</td>
+<td> Yes</td>
+<td> Yes</td>
+<td> Horizontal scrolling on narrow screens</td>
+</tr>
+<tr>
+<td> Mermaid</td>
+<td> Yes</td>
+<td> Yes</td>
+<td> Yes</td>
+<td> Lazy-loaded</td>
+</tr>
+</tbody>
+</table>
+<h2>Eight columns</h2>
+<table>
+<thead>
+<tr>
+<th> F1</th>
+<th> F2</th>
+<th> F3</th>
+<th> F4</th>
+<th> F5</th>
+<th> F6</th>
+<th> F7</th>
+<th> F8</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td> a</td>
+<td> b</td>
+<td> c</td>
+<td> d</td>
+<td> e</td>
+<td> f</td>
+<td> g</td>
+<td> h</td>
+</tr>
+<tr>
+<td> i</td>
+<td> j</td>
+<td> k</td>
+<td> l</td>
+<td> m</td>
+<td> n</td>
+<td> o</td>
+<td> p</td>
+</tr>
+</tbody>
+</table>
+<h2>Wide table — 12 columns</h2>
+<table>
+<thead>
+<tr>
+<th> C1</th>
+<th> C2</th>
+<th> C3</th>
+<th> C4</th>
+<th> C5</th>
+<th> C6</th>
+<th> C7</th>
+<th> C8</th>
+<th> C9</th>
+<th> C10</th>
+<th> C11</th>
+<th> C12</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td> A1</td>
+<td> A2</td>
+<td> A3</td>
+<td> A4</td>
+<td> A5</td>
+<td> A6</td>
+<td> A7</td>
+<td> A8</td>
+<td> A9</td>
+<td> A10</td>
+<td> A11</td>
+<td> A12</td>
+</tr>
+<tr>
+<td> B1</td>
+<td> B2</td>
+<td> B3</td>
+<td> B4</td>
+<td> B5</td>
+<td> B6</td>
+<td> B7</td>
+<td> B8</td>
+<td> B9</td>
+<td> B10</td>
+<td> B11</td>
+<td> B12</td>
+</tr>
+</tbody>
+</table>
+<h2>Formatted cells</h2>
+<table>
+<thead>
+<tr>
+<th> Feature</th>
+<th> Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td> Bold</td>
+<td> <strong>important</strong></td>
+</tr>
+<tr>
+<td> Italic</td>
+<td> <em>emphasis</em></td>
+</tr>
+<tr>
+<td> Code</td>
+<td> <code>npm install</code></td>
+</tr>
+<tr>
+<td> Link</td>
+<td> <a href="https://github.com/">GitHub</a></td>
+</tr>
+<tr>
+<td> Long text</td>
+<td> This is a deliberately long cell that should remain readable without breaking the table layout.</td>
+</tr>
+</tbody>
+</table>
+<h2>Alignment variants</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: left"> Left</th>
+<th style="text-align: center"> Center</th>
+<th style="text-align: right"> Right</th>
+<th> Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left"> l</td>
+<td style="text-align: center"> c</td>
+<td style="text-align: right"> r</td>
+<td> d</td>
+</tr>
+<tr>
+<td style="text-align: left"> a longer cell</td>
+<td style="text-align: center"> a longer cell</td>
+<td style="text-align: right"> a longer cell</td>
+<td> a longer cell</td>
+</tr>
+</tbody>
+</table>
+<h2>Table without leading or trailing pipes</h2>
+<p>Name | Value
+--- | ---
+Alpha | 1
+Beta | 2</p>
+<h2>Escaped pipe and pipe inside inline code</h2>
+<table>
+<thead>
+<tr>
+<th> Case</th>
+<th> Rendered as</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td> Escaped pipe</td>
+<td> a | b</td>
+</tr>
+<tr>
+<td> Pipe inside inline code (escaped for the table)</td>
+<td> <code>a \| b</code></td>
+</tr>
+<tr>
+<td> Pipe escaped inside a link label</td>
+<td> <a href="https://github.com/">a | b</a></td>
+</tr>
+</tbody>
+</table>
+<h2>Empty cells</h2>
+<table>
+<thead>
+<tr>
+<th> A</th>
+<th> B</th>
+<th> C</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td> 1</td>
+<td></td>
+<td> 3</td>
+</tr>
+<tr>
+<td></td>
+<td> 2</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h2>Mathematical expressions inside cells (where supported)</h2>
+<table>
+<thead>
+<tr>
+<th> Formula</th>
+<th> Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td> <eq class="tex-to-render">$E = mc^2$</eq></td>
+<td> mass-energy equivalence</td>
+</tr>
+<tr>
+<td> <eq class="tex-to-render">$\frac{a}{b}$</eq></td>
+<td> fraction</td>
+</tr>
+<tr>
+<td> <eq class="tex-to-render">$\sum_{i=1}^{n} i$</eq></td>
+<td> sum</td>
+</tr>
+</tbody>
+</table>
+<h2>Wide table — 20 columns</h2>
+<table>
+<thead>
+<tr>
+<th> C1</th>
+<th> C2</th>
+<th> C3</th>
+<th> C4</th>
+<th> C5</th>
+<th> C6</th>
+<th> C7</th>
+<th> C8</th>
+<th> C9</th>
+<th> C10</th>
+<th> C11</th>
+<th> C12</th>
+<th> C13</th>
+<th> C14</th>
+<th> C15</th>
+<th> C16</th>
+<th> C17</th>
+<th> C18</th>
+<th> C19</th>
+<th> C20</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td> A1</td>
+<td> A2</td>
+<td> A3</td>
+<td> A4</td>
+<td> A5</td>
+<td> A6</td>
+<td> A7</td>
+<td> A8</td>
+<td> A9</td>
+<td> A10</td>
+<td> A11</td>
+<td> A12</td>
+<td> A13</td>
+<td> A14</td>
+<td> A15</td>
+<td> A16</td>
+<td> A17</td>
+<td> A18</td>
+<td> A19</td>
+<td> A20</td>
+</tr>
+<tr>
+<td> B1</td>
+<td> B2</td>
+<td> B3</td>
+<td> B4</td>
+<td> B5</td>
+<td> B6</td>
+<td> B7</td>
+<td> B8</td>
+<td> B9</td>
+<td> B10</td>
+<td> B11</td>
+<td> B12</td>
+<td> B13</td>
+<td> B14</td>
+<td> B15</td>
+<td> B16</td>
+<td> B17</td>
+<td> B18</td>
+<td> B19</td>
+<td> B20</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1>9. Horizontal Rule</h1>
+<p>Content before the rule.</p>
+<hr />
+<p>Content after the rule.</p>
+<hr />
+<h1>10. Escaping and Special Characters</h1>
+<p>Literal Markdown characters:</p>
+<p>*asterisk*<br />
+_underscore_<br />
+[brackets]<br />
+# hash<br />
+&gt; greater-than</p>
+<p>HTML entities:</p>
+<p><code>&amp;amp;</code> &amp;<br />
+<code>&amp;lt;</code> &lt;<br />
+<code>&amp;gt;</code> &gt;</p>
+<h2>Unicode, bidirectional text and emoji</h2>
+<p>Accented Latin: á é í ó ú ñ ü ç ß Å Æ Ø å æ ø</p>
+<p>CJK: 日本語のテキスト、中文文本、한국어 텍스트</p>
+<p>Right-to-left: العربية and עברית must render with correct direction, including when they contain punctuation.</p>
+<p>Mixed direction on one line: English text, العربية text, more English text.</p>
+<p>Emoji: 😀 🚀 🧪 🇦🇷 👩‍💻 — the last one is a zero-width-joiner sequence and must not be split apart.</p>
+<p>Mathematical and typographic symbols: ∀x ∈ ℝ, ∑ ± × ÷ ≤ ≥ ≠ ∞ → ⇒ ⌘ € £ ¥ © ® ™ …</p>
+<h2>CJK emphasis and the CommonMark flanking rules</h2>
+<p>CommonMark decides whether <code>**</code> may open or close by <em>flanking</em> rules. One of them is: a closing <code>**</code> that is
+preceded by a punctuation character may only close if it is followed by whitespace or punctuation. Chinese,
+Japanese and Korean prose is written without spaces, so a construction that is completely normal in those
+languages — bold around a quoted phrase, immediately followed by more text — fails that test and the asterisks are
+rendered literally:</p>
+<ul>
+<li>**「重要」**中文 — the closing <code>**</code> is preceded by punctuation (<code>」</code>) and followed by a letter (<code>中</code>), so
+CommonMark refuses to close it. The expected rendering today is <strong>literal asterisks</strong>, not bold.</li>
+<li>**（注）**の続き — the same shape with Japanese brackets and kana.</li>
+<li>中文<strong>强调</strong>。 — this one must <strong>become bold</strong>: the closing <code>**</code> is preceded by a letter, so it is right-flanking.</li>
+</ul>
+<p>An implementation can fix the first two with a parser extension — one that allows <code>**</code> to close after Unicode
+punctuation when the next character is CJK. Whether MDHoriZon adopts one is a Phase 1 decision; the survey of prior
+art is in <a href="../../docs/references.md"><code>docs/references.md</code></a>. That class of fix applies to asterisks only, so
+underscore emphasis (<code>__…__</code>) keeps the CommonMark behavior.</p>
+<p>This section is pinned on purpose: if the extension is adopted, the expected output of the first two lines changes
+and this section must be updated deliberately, with the decision recorded.</p>
+<hr />
+<h1>11. Mathematics</h1>
+<h2>Inline</h2>
+<p>Einstein's famous equation is <eq class="tex-to-render">$E = mc^2$</eq>.</p>
+<p>Another example: <eq class="tex-to-render">$a^2 + b^2 = c^2$</eq>.</p>
+<h2>Display</h2>
+<section><eqn class="tex-to-render">$$\int_0^\infty e^{-x}\,dx = 1
+$$</eqn></section>
+<h2>Fraction</h2>
+<section><eqn class="tex-to-render">$$\frac{a}{b} + \frac{c}{d}
+$$</eqn></section>
+<h2>Sum</h2>
+<section><eqn class="tex-to-render">$$\sum_{i=1}^{n} i = \frac{n(n+1)}{2}
+$$</eqn></section>
+<h2>Matrix</h2>
+<section><eqn class="tex-to-render">$$\begin{bmatrix}
+1 &amp; 2 &amp; 3 \\
+4 &amp; 5 &amp; 6 \\
+7 &amp; 8 &amp; 9
+\end{bmatrix}
+$$</eqn></section>
+<h2>Long expression</h2>
+<section><eqn class="tex-to-render">$$\frac{\partial}{\partial t}
+\left(
+\frac{1}{2}\rho |\mathbf{u}|^2
+\right)
++
+\nabla \cdot
+\left[
+\left(
+\frac{1}{2}\rho |\mathbf{u}|^2 + p
+\right)\mathbf{u}
+\right]
+= 0
+$$</eqn></section>
+<h2>Superscripts, subscripts and Greek letters</h2>
+<p>Inline: <eq class="tex-to-render">$x^2 + y_1$</eq>, <eq class="tex-to-render">$a_{n+1}$</eq>, <eq class="tex-to-render">$\alpha$</eq>, <eq class="tex-to-render">$\beta$</eq>, <eq class="tex-to-render">$\gamma$</eq>, <eq class="tex-to-render">$\Delta$</eq>, <eq class="tex-to-render">$\Omega$</eq>, <eq class="tex-to-render">$\theta$</eq>.</p>
+<h2>Text inside math</h2>
+<section><eqn class="tex-to-render">$$\text{rate} = \frac{\Delta x}{\Delta t}
+$$</eqn></section>
+<h2>Aligned expressions</h2>
+<section><eqn class="tex-to-render">$$\begin{aligned}
+a &amp;= b + c \\
+  &amp;= d + e
+\end{aligned}
+$$</eqn></section>
+<h2>Formulas inside lists</h2>
+<ul>
+<li>
+<p>Inline math in a list item: <eq class="tex-to-render">$E = mc^2$</eq>.</p>
+</li>
+<li>
+<p>Display math inside a list item:</p>
+<section><eqn class="tex-to-render">$$\sum_{i=1}^{n} i = \frac{n(n+1)}{2}
+$$</eqn></section>
+</li>
+<li>
+<p>Item after the math.</p>
+</li>
+</ul>
+<h2>Formulas inside blockquotes</h2>
+<blockquote>
+<p>Inline math inside a blockquote: <eq class="tex-to-render">$a^2 + b^2 = c^2$</eq>.</p>
+<p>Display math inside a blockquote:</p>
+<section><eqn class="tex-to-render">$$\int_0^1 x\,dx = \frac{1}{2}
+$$</eqn></section>
+</blockquote>
+<p>Formulas inside table cells are covered in section 8.</p>
+<h2>Missing and invalid math must degrade gracefully</h2>
+<p>An unterminated delimiter must stay literal instead of swallowing the rest of the paragraph: $E = mc^2</p>
+<p>An unknown command must produce an error (or a literal fallback) without crashing the article:
+<eq class="tex-to-render">$\thisCommandDoesNotExist{x}$</eq></p>
+<p>Currency must not be mistaken for mathematics: the item costs $5 and the other costs $10 today.</p>
+<p>An escaped dollar renders as a literal dollar sign: $100.</p>
+<hr />
+<h1>12. Mermaid</h1>
+<h2>Flowchart</h2>
+<pre><code class="language-mermaid">flowchart TD
+    A[Markdown file] --&gt; B[Parser]
+    B --&gt; C{Content type}
+    C --&gt;|Normal Markdown| D[React renderer]
+    C --&gt;|Math| E[KaTeX]
+    C --&gt;|Mermaid| F[Mermaid renderer]
+    D --&gt; G[Article]
+    E --&gt; G
+    F --&gt; G
+</code></pre>
+<h2>Sequence diagram</h2>
+<pre><code class="language-mermaid">sequenceDiagram
+    participant User
+    participant App
+    participant Storage
+    User-&gt;&gt;App: Open article
+    App-&gt;&gt;Storage: Load Markdown
+    Storage--&gt;&gt;App: Markdown + assets
+    App--&gt;&gt;User: Render article
+</code></pre>
+<h2>Class-style example</h2>
+<pre><code class="language-mermaid">classDiagram
+    class MarkdownDocument {
+        +string title
+        +string content
+        +render()
+    }
+
+    class OfflineLibrary {
+        +downloadAll()
+        +update()
+        +deleteAll()
+    }
+
+    MarkdownDocument --&gt; OfflineLibrary
+</code></pre>
+<h2>State diagram</h2>
+<pre><code class="language-mermaid">stateDiagram-v2
+    [*] --&gt; Reading
+    Reading --&gt; Downloading: user requests offline copy
+    Downloading --&gt; AvailableOffline: download complete
+    AvailableOffline --&gt; Reading: open from local storage
+    Reading --&gt; [*]
+</code></pre>
+<h2>Additional supported diagram type</h2>
+<pre><code class="language-mermaid">pie title Content sources
+    &quot;Network&quot; : 45
+    &quot;Bundled&quot; : 25
+    &quot;Offline storage&quot; : 30
+</code></pre>
+<h2>Invalid diagrams must not crash the article</h2>
+<p>The first block below is malformed Mermaid syntax; the second is not Mermaid at all. Both must produce visible
+error feedback (or a readable fallback) while the rest of the document keeps rendering.</p>
+<pre><code class="language-mermaid">flowchart TD
+    A[Unclosed label --&gt; B
+</code></pre>
+<pre><code class="language-mermaid">this is not a valid mermaid diagram at all
+</code></pre>
+<hr />
+<h1>13. Frontmatter</h1>
+<p>The following is an example of frontmatter syntax:</p>
+<pre><code class="language-yaml">---
+title: Golden Test Document
+description: MDHoriZon renderer validation fixture
+date: 2026-09-13
+tags:
+  - markdown
+  - testing
+  - mdhorizon
+---
+</code></pre>
+<p>The application must decide whether frontmatter is removed before rendering and how metadata is consumed.</p>
+<p>Frontmatter is only recognized at the very start of a file, so this golden document cannot test it directly — the
+block above documents the syntax, it is not a live frontmatter block. Real frontmatter parsing must be covered by a
+separate fixture whose first bytes are the opening delimiter.</p>
+<hr />
+<h1>14. Raw HTML and Security</h1>
+<p>The following is intentionally included to verify the project's raw-HTML policy.</p>
+<pre><code class="language-html">&lt;strong&gt;Raw HTML test&lt;/strong&gt;
+</code></pre>
+<p>Potentially dangerous examples must be tested by automated security fixtures rather than relying on visual inspection:</p>
+<pre><code class="language-html">&lt;script&gt;alert(&quot;unsafe&quot;)&lt;/script&gt;
+</code></pre>
+<pre><code class="language-html">&lt;img src=&quot;x&quot; onerror=&quot;alert('unsafe')&quot;&gt;
+</code></pre>
+<pre><code class="language-html">&lt;a href=&quot;javascript:alert('unsafe')&quot;&gt;unsafe link&lt;/a&gt;
+</code></pre>
+<p>Dangerous SVG, embedded documents and other unsafe external resources:</p>
+<pre><code class="language-html">&lt;svg&gt;&lt;script&gt;alert(&quot;unsafe&quot;)&lt;/script&gt;&lt;/svg&gt;
+</code></pre>
+<pre><code class="language-html">&lt;svg onload=&quot;alert('unsafe')&quot;&gt;&lt;circle r=&quot;10&quot; /&gt;&lt;/svg&gt;
+</code></pre>
+<pre><code class="language-html">&lt;iframe src=&quot;https://example.com&quot;&gt;&lt;/iframe&gt;
+</code></pre>
+<pre><code class="language-html">&lt;object data=&quot;https://example.com&quot;&gt;&lt;/object&gt;
+</code></pre>
+<pre><code class="language-html">&lt;embed src=&quot;https://example.com&quot;&gt;
+</code></pre>
+<pre><code class="language-html">&lt;style&gt;body { display: none }&lt;/style&gt;
+</code></pre>
+<pre><code class="language-html">&lt;base href=&quot;https://evil.example/&quot;&gt;
+</code></pre>
+<pre><code class="language-html">&lt;meta http-equiv=&quot;refresh&quot; content=&quot;0;url=https://evil.example/&quot;&gt;
+</code></pre>
+<pre><code class="language-html">&lt;form action=&quot;https://evil.example/&quot;&gt;&lt;input name=&quot;secret&quot; type=&quot;password&quot;&gt;&lt;/form&gt;
+</code></pre>
+<p>Obfuscated unsafe URLs, which must be rejected by normalization rather than by naive string matching:</p>
+<pre><code class="language-html">&lt;a href=&quot;JaVaScRiPt:alert('unsafe')&quot;&gt;mixed-case javascript URL&lt;/a&gt;
+</code></pre>
+<pre><code class="language-html">&lt;a href=&quot;java&amp;#x73;cript:alert('unsafe')&quot;&gt;entity-encoded javascript URL&lt;/a&gt;
+</code></pre>
+<pre><code class="language-html">&lt;a href=&quot;  javascript:alert('unsafe')&quot;&gt;javascript URL with leading whitespace&lt;/a&gt;
+</code></pre>
+<p>Markdown-native unsafe URLs must also be rejected, not only the raw-HTML ones:</p>
+<p><a href="">Markdown link to javascript:</a></p>
+<p><img src="" alt="Markdown image with a data URI" /></p>
+<p><a href="">Markdown link with a data:text/html URI</a></p>
+<p>Expected behavior is determined by the project's explicit sanitization policy.</p>
+<hr />
+<h1>15. Nested Content</h1>
+<blockquote>
+<p><strong>Important note</strong></p>
+<ul>
+<li>List inside a quote</li>
+<li>Another item</li>
+</ul>
+<pre><code class="language-bash">echo &quot;code inside quote&quot;
+</code></pre>
+</blockquote>
+<hr />
+<h1>16. Content Mixing</h1>
+<p>A document can contain <strong>bold</strong>, <code>code</code>, <a href="https://github.com/">links</a>, formulas such as <eq class="tex-to-render">$x^2$</eq>, and lists together.</p>
+<ol>
+<li>Install dependencies.</li>
+<li>Run the application.</li>
+<li>Open the article.</li>
+<li>Test the Mermaid diagram.</li>
+<li>Disable the network.</li>
+<li>Open the same article from offline storage.</li>
+</ol>
+<hr />
+<h1>17. Offline Content Test</h1>
+<p>This section is specifically for the mobile offline feature.</p>
+<p>The article must render correctly when loaded from:</p>
+<ol>
+<li>Network.</li>
+<li>Bundled application content.</li>
+<li>Downloaded offline storage.</li>
+</ol>
+<p>The rendered result should be equivalent regardless of source.</p>
+<p>The application should also be able to resolve the relative image and relative link examples after the content has been downloaded.</p>
+<hr />
+<h1>18. Accessibility Checks</h1>
+<p>The rendered result should expose:</p>
+<ul>
+<li>A logical heading hierarchy.</li>
+<li>Keyboard-accessible links.</li>
+<li>Keyboard-accessible copy buttons.</li>
+<li>Meaningful image alternative text.</li>
+<li>Semantic tables.</li>
+<li>Visible focus indicators.</li>
+<li>Sufficient contrast.</li>
+</ul>
+<p>Content that exercises those requirements:</p>
+<ul>
+<li>A decorative image that must be ignored by assistive technology: <img src="images/example.png" alt="" /></li>
+<li>A meaningful image that must be announced: <img src="images/example.png" alt="MDHoriZon fixture asset" /></li>
+<li>Collapsible content that must be keyboard operable (subject to the raw-HTML policy — if <code>&lt;details&gt;</code> is
+stripped, this case documents that decision rather than failing):</li>
+</ul>
+<!-- raw HTML omitted -->
+<p>The hidden sentence.</p>
+<!-- raw HTML omitted -->
+<hr />
+<h1>19. Video</h1>
+<p>A video is media, not decoration. A YouTube URL must preview on the page, and it must be usable as an entry's
+cover image when that entry has no image of its own — or when the video comes first. That is why the cover rule
+counts images and videos together.</p>
+<p>A video URL that makes up a whole paragraph is the case the in-page player is for. A video URL <em>inside a sentence</em>
+stays an ordinary link, because replacing it with a player would break the prose around it:</p>
+<p><a href="https://youtu.be/G7ZqUvFMSes?si=Qpzhs52nIY8xvdHv">DeepSeek Harness: Tu propio Claude Code GRATIS</a></p>
+<p>The same video as a bare URL must be turned into a link, and must still be recognised as a video, query string and
+all:</p>
+<p>https://youtu.be/G7ZqUvFMSes</p>
+<p>The same video, this time inside a sentence, which must stay a link: mira este vídeo sobre <a href="https://www.youtube.com/watch?v=G7ZqUvFMSes">DeepSeek
+Harness</a> y dime qué te parece.</p>
+<hr />
+<h1>20. Final Regression Checklist</h1>
+<ul class="contains-task-list">
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled="" /> H1–H6, setext and closed ATX headings render correctly.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled="" /> Duplicate headings receive deterministic, distinct anchors.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled="" /> Inline formatting renders correctly.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled="" /> Unicode, bidirectional text and emoji render correctly.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled="" /> CJK strong emphasis behaves as this document specifies, including the punctuation-adjacent cases.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled="" /> Links work, including autolinks, reference-style links, titled links and relative links to another document.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled="" /> Hard and soft line breaks behave as specified.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled="" /> Images work or fail gracefully, including the deliberately missing one.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled="" /> Decorative images expose empty alternative text and are not announced.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled="" /> Very wide and very tall images keep their aspect ratio without breaking the layout.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled="" /> Relative assets resolve correctly, including paths with redundant <code>./</code> and <code>..</code> segments.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled="" /> Lists render correctly, including loose lists, multi-paragraph items and lists starting at 5.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled="" /> Blockquotes render correctly, including nested ones.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled="" /> Code blocks highlight correctly, including unknown languages, aliases and indented blocks.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled="" /> Long code lines and unbroken tokens scroll horizontally.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled="" /> Copy button works and is keyboard accessible.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled="" /> Tables scroll horizontally on narrow screens.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled="" /> Wide tables (up to 20 columns) do not break the viewport.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled="" /> Table alignment, escaped pipes, empty cells and math inside cells render correctly.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled="" /> KaTeX renders correctly, including inside lists and blockquotes.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled="" /> Invalid or missing math degrades gracefully without crashing the article.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled="" /> Mermaid renders correctly, including state diagrams and additional diagram types.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled="" /> Mermaid errors do not crash the article and produce visible feedback.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled="" /> A YouTube link that stands alone is recognised as a video and previews without loading a third party.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled="" /> A video URL inside a sentence stays a link.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled="" /> A video URL with a query string is recognised.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled="" /> Themes remain readable.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled="" /> Unsafe content is sanitized according to policy, including SVG, iframes, <code>data:</code> URIs and obfuscated <code>javascript:</code> URLs.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled="" /> The complete document works offline.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled="" /> The complete document works inside Android WebView.</li>
+<li class="task-list-item"><input class="task-list-item-checkbox" type="checkbox" disabled="" /> The complete document works inside iOS WebView when available.</li>
+</ul>
+<hr />
+<p><strong>This file is a rendering specification and regression fixture. Do not simplify it merely because the current application does not yet support every feature. Unsupported sections should become explicit roadmap/test targets.</strong></p>

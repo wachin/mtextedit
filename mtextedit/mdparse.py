@@ -469,9 +469,15 @@ def parse_tokens(text: str) -> list[Token]:
     return parse_document(text).tokens
 
 
-def render_html(text: str, options: int = 0) -> str:
-    """Render ``text`` to HTML with cmark itself."""
+def render_html(text: str, options: int | None = None) -> str:
+    """Render ``text`` to HTML with cmark itself.
+
+    GFM task lists are enabled by default; pass an explicit options mask to
+    override that (``0`` means cmark's plain default).
+    """
     cmark = require_cmark()
+    if options is None:
+        options = cmark.Options.CMARK_OPT_TASKLISTS
     document = cmark.parse_document(text, options)
     try:
         return cmark.render_html(document, options)
