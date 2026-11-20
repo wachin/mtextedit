@@ -235,6 +235,14 @@ class DocumentBuilderTest(unittest.TestCase):
         self.assertEqual(fmt.fontWeight(), QFont.Weight.Bold)
         self.assertAlmostEqual(fmt.fontPointSize(), 18.0)
 
+    def test_unstyled_pygments_token_falls_back(self):
+        from pygments.token import Token
+
+        from mtextedit.highlight import _colour
+
+        # Mermaid's lexer emits Literal.Scalar.Plain, which our style omits.
+        self.assertIsInstance(_colour(Token.Literal.Scalar.Plain), str)
+
 
 if __name__ == "__main__":
     unittest.main()

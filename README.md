@@ -146,6 +146,11 @@ QT_QPA_PLATFORM=offscreen python3 -m unittest discover -s tests -v
 QT_QPA_PLATFORM=offscreen python3 -m unittest discover -s libs/mtextedit/tests -t libs/mtextedit -v
 ```
 
+`tests/fixtures/golden-document.md` is a 936-line rendering fixture (adapted
+from MDHoriZon) exercised through the parser, the HTML renderer and the
+editor/preview pipeline: headings, tables up to 20 columns, code fences,
+images, math and task lists.
+
 ## Install
 
 ```bash

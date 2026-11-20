@@ -37,9 +37,18 @@ def _lexer_for(lang: str):
 
 
 def _colour(token_type) -> str:
-    info = GitHubLightStyle.style_for_token(token_type)
-    colour = info.get("color")
-    return f"#{colour}" if colour else CODE_TEXT
+    # Pygments styles only define a subset of tokens (Mermaid's lexer emits
+    # Literal.Scalar.Plain, for instance); walk up to the nearest styled parent.
+    token = token_type
+    while token is not None:
+        try:
+            info = GitHubLightStyle.style_for_token(token)
+        except KeyError:
+            token = token.parent
+            continue
+        colour = info.get("color")
+        return f"#{colour}" if colour else CODE_TEXT
+    return CODE_TEXT
 
 
 def _merge(runs: LineRuns) -> LineRuns:
