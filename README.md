@@ -70,7 +70,7 @@ instead of a custom layout, preview scope and limitations) is in
 > There is no bundled C++ highlighting engine: the KSyntaxHighlighting fork was
 > removed, and code blocks are highlighted with Pygments. Its MIT-licensed
 > GitHub Light palette survives as `mtextedit.code_style.GitHubLightStyle`, which
-> the in-place preview paints fenced code with, token by token, using runs
+> both native previews paint fenced code with, token by token, using runs
 > computed on the render worker (see `DESIGN.md` D12 and D14).
 
 ## Usage

@@ -19,11 +19,11 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from PyQt6.QtCore import QRectF
-from PyQt6.QtGui import QColor, QImage, QPainter
+from PyQt6.QtGui import QColor, QFont, QImage, QPainter, QTextDocument
 from PyQt6.QtWidgets import QApplication
 
-from mtextedit._markdown import build_md
-from mtextedit.code_style import CODE_TEXT, KEYWORD, STRING
+from mtextedit._markdown import build_document, build_md
+from mtextedit.code_style import CODE_TEXT, CONSTANT, KEYWORD, STRING
 from mtextedit.highlight import (
     MAX_HIGHLIGHT_CHARS,
     _expand_tabs,
@@ -160,6 +160,81 @@ class PaintingTest(unittest.TestCase):
         image = self._paint(self._spec(None))
         self.assertFalse(
             self._near(image, KEYWORD), "flat fallback should not use keywords")
+
+
+class DocumentBuilderTest(unittest.TestCase):
+    """The full-document preview shares the in-place preview's code colours."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    @staticmethod
+    def _document(source: str, annotate: bool = True) -> QTextDocument:
+        tokens = build_md().parse(source)
+        if annotate:
+            annotate_code_runs(tokens)
+        doc = QTextDocument()
+        build_document(tokens, doc)
+        return doc
+
+    @staticmethod
+    def _block(doc: QTextDocument, text: str):
+        block = doc.firstBlock()
+        while block.isValid():
+            if block.text() == text:
+                return block
+            block = block.next()
+        return None
+
+    @staticmethod
+    def _fragment(block, text: str):
+        it = block.begin()
+        while not it.atEnd():
+            fragment = it.fragment()
+            if fragment.isValid() and fragment.text() == text:
+                return fragment
+            it += 1
+        return None
+
+    def test_fenced_code_is_coloured(self):
+        doc = self._document("```python\ndef f():\n    return 1\n```\n")
+        keyword = self._fragment(self._block(doc, "def f():"), "def")
+        self.assertIsNotNone(keyword)
+        fmt = keyword.charFormat()
+        self.assertEqual(fmt.foreground().color().name(), KEYWORD)
+        self.assertEqual(fmt.fontFamily(), "monospace")
+
+    def test_number_and_keyword_keep_distinct_colours(self):
+        doc = self._document("```python\ndef f():\n    return 1\n```\n")
+        block = self._block(doc, "    return 1")
+        self.assertIsNotNone(block)
+        self.assertEqual(
+            self._fragment(block, "return").charFormat().foreground().color().name(),
+            KEYWORD)
+        self.assertEqual(
+            self._fragment(block, "1").charFormat().foreground().color().name(),
+            CONSTANT)
+
+    def test_text_is_not_altered_by_colouring(self):
+        doc = self._document("```python\ndef f():\n    return 1\n```\n")
+        self.assertEqual(doc.toPlainText(), "def f():\n    return 1")
+
+    def test_unannotated_tokens_stay_flat(self):
+        doc = self._document("```python\ndef f():\n    return 1\n```\n",
+                             annotate=False)
+        block = self._block(doc, "def f():")
+        self.assertIsNotNone(block)
+        fmt = self._fragment(block, "def f():").charFormat()
+        self.assertNotEqual(fmt.foreground().color().name(), KEYWORD)
+
+    def test_heading_keeps_its_size_and_weight(self):
+        doc = self._document("# Title\n", annotate=False)
+        block = self._block(doc, "Title")
+        self.assertIsNotNone(block)
+        fmt = self._fragment(block, "Title").charFormat()
+        self.assertEqual(fmt.fontWeight(), QFont.Weight.Bold)
+        self.assertAlmostEqual(fmt.fontPointSize(), 18.0)
 
 
 if __name__ == "__main__":

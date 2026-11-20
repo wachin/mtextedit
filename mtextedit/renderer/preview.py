@@ -7,8 +7,10 @@ This is the key divergence from VNote, which reloaded the whole document into a
 on a worker thread, rebuilding the ``QTextDocument`` here is cheap and scales
 with visible structure rather than forcing a full Chromium re-layout.
 
-If ``PyQt6.QtWebEngineWidgets`` is importable, a faithful HTML preview with
-Pygments-highlighted code is available via :meth:`set_webengine_enabled`.
+The native path colours fenced code with the runs the render worker attached to
+the token stream, so it matches the in-place preview. If
+``PyQt6.QtWebEngineWidgets`` is importable, a faithful HTML preview is available
+via :meth:`set_webengine_enabled`.
 """
 
 from __future__ import annotations

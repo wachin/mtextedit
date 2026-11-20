@@ -125,9 +125,10 @@ answer to VNote's per-keystroke full re-render.
 
 ## D8. Pygments for code; no C++ highlighting engine
 
-**Decision.** Code blocks are highlighted with Pygments (HTML path) and rendered
-monospace in the native preview, using `mtextedit.code_style.GitHubLightStyle`.
-No C++ highlighting engine is built, bound or vendored.
+**Decision.** Code blocks are highlighted with Pygments in both native previews
+(the in-place card and the optional full-document `PreviewWidget`) and in the
+HTML path, all using `mtextedit.code_style.GitHubLightStyle`. No C++ highlighting
+engine is built, bound or vendored.
 
 **Rationale.** KSyntaxHighlighting is C++/Qt and not importable from Python.
 Pygments is pure Python and already a dependency, and it covers more languages
@@ -159,6 +160,9 @@ but the default experience is in-place preview.
 **Rationale.** Keeps a non-in-place option for read-only/full-page use without
 forcing Chromium into the default path. `QWebEngineView` is optional and was not
 installed in the development environment.
+
+**Consequences.** Its native builder consumes the same worker-computed colour
+runs as the in-place card, so both native surfaces show identical token colours.
 
 ---
 

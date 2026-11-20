@@ -14,10 +14,10 @@ Design notes
   highlighting -- mirroring how VNote derived its outline from the cmark AST
   rather than regex-scanning the source.
 * Code blocks: highlighted with Pygments, sharing ``code_style.GitHubLightStyle``
-  with the in-place preview. The in-place token runs are computed on the render
-  worker (``highlight.annotate_code_runs``) and travel on the token stream, so
-  the GUI thread never runs a lexer; the full-document ``QTextDocument`` preview
-  keeps a plain monospace face.
+  across every preview. The colour runs are computed on the render worker
+  (``highlight.annotate_code_runs``) and travel on the token stream, so the GUI
+  thread never runs a lexer; the in-place card and this module's full-document
+  ``QTextDocument`` builder both paint those same runs.
 * The native preview (``build_document``) replaces VNote's full-document
   ``QWebEngineView.setHtml`` reload. We build a ``QTextDocument`` directly
   from the token stream, which keeps the heavy parse on a worker thread and
@@ -163,6 +163,7 @@ def build_document(tokens: List[Any], doc: "Any") -> None:
     blocks. Incremental/diff updates are a documented future optimisation.
     """
     from PyQt6.QtGui import (
+        QColor,
         QTextBlockFormat,
         QTextCharFormat,
         QTextCursor,
@@ -173,19 +174,20 @@ def build_document(tokens: List[Any], doc: "Any") -> None:
 
     doc.clear()
     builder = _DocBuilder(doc, QTextCursor, QTextBlockFormat, QTextCharFormat,
-                         QFont, Qt)
+                         QFont, Qt, QColor)
     builder.run(tokens)
 
 
 class _DocBuilder:
     def __init__(self, doc, QTextCursor, QTextBlockFormat, QTextCharFormat,
-                 QFont, Qt):
+                 QFont, Qt, QColor=None):
         self.doc = doc
         self.cursor = QTextCursor(doc)
         self.QTextBlockFormat = QTextBlockFormat
         self.QTextCharFormat = QTextCharFormat
         self.QFont = QFont
         self.Qt = Qt
+        self.QColor = QColor
         self.list_stack: List[Dict[str, Any]] = []
         self.quote_depth = 0
         self.list_item_marker: Optional[str] = None
@@ -232,7 +234,13 @@ class _DocBuilder:
         marker = self._consume_marker()
         if marker:
             self.cursor.insertText(marker)
-        self._render_inline(inline)
+        # Inline text takes its format from ``cf_stack``; without pushing the
+        # heading format here it would be inserted plain.
+        self.cf_stack.append(cf)
+        try:
+            self._render_inline(inline)
+        finally:
+            self.cf_stack.pop()
 
     def _para_block(self, inline):
         self._new_block()
@@ -248,7 +256,19 @@ class _DocBuilder:
         bf.setTopMargin(4)
         bf.setBottomMargin(4)
         self._new_block(bf=bf, cf=cf)
-        self.cursor.insertText(tok.content.rstrip("\n"))
+        # Runs are computed by the render worker (highlight.annotate_code_runs)
+        # and travel on the token stream; without them the block stays flat.
+        runs = (tok.meta or {}).get("highlight") or []
+        if not runs:
+            self.cursor.insertText(tok.content.rstrip("\n"))
+            return
+        for index, line in enumerate(runs):
+            if index:
+                self.cursor.insertBlock(bf, cf)
+            for text, colour in line:
+                run_cf = self.QTextCharFormat(cf)
+                run_cf.setForeground(self.QColor(colour))
+                self.cursor.insertText(text, run_cf)
 
     def _hr(self):
         cf = self._base_cf()
