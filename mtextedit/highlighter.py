@@ -8,9 +8,12 @@ The highlighter styles two layers:
    :func:`mtextedit._markdown.collect_block_regions`; the highlighter caches
    them and re-highlights. The Markdown parse stays off the GUI thread.
 2. *Inline* emphasis (``**bold**``, ``*italic*``, `` `code` ``, ``[link](u)``,
-   ``~~strike~~``, ``==mark==``) is computed per-block with lightweight regex on
-   the GUI thread -- cheap because it only touches the visible block. Exact
-   cmark spans will replace these regexes in a later step.
+   ``~~strike~~``, ``==mark==``) uses the exact cmark spans delivered with the
+   render. Regexes remain only as a fallback until the first render arrives.
+
+Markers are cropped to zero width on lines without the cursor by applying a
+transparent copy of the span format with negative absolute letter spacing;
+the cursor's line expands them again.
 
 Formats come from a :class:`mtextedit.theme.Theme`, i.e. VNote's ``.theme``
 format. The bundled ``Native`` theme is the default, so the look follows VNote;
@@ -23,6 +26,7 @@ from PyQt6.QtCore import QRegularExpression
 from PyQt6.QtGui import (
     QColor,
     QFont,
+    QFontMetricsF,
     QSyntaxHighlighter,
     QTextCharFormat,
     QTextDocument,
@@ -65,6 +69,8 @@ class MarkdownHighlighter(QSyntaxHighlighter):
         self._spans: list = []
         self._spans_ready = False
         self._cursor_line = -1
+        self._conceal_markers = True
+        self._concealed_cache: dict[tuple, QTextCharFormat] = {}
         self._theme = theme if theme is not None else load_default()
         self._setup_formats()
         self._setup_inline_patterns()
@@ -78,6 +84,7 @@ class MarkdownHighlighter(QSyntaxHighlighter):
     def set_theme(self, theme: Theme) -> None:
         """Swap the theme and restyle every block."""
         self._theme = theme
+        self._concealed_cache.clear()
         self._setup_formats()
         self._setup_inline_patterns()
         self.rehighlight()
@@ -108,12 +115,6 @@ class MarkdownHighlighter(QSyntaxHighlighter):
         self.f_mark = _char_format(theme.syntax_style("MARK"))
         self.f_math = _char_format(theme.syntax_style("INLINEEQUATION"))
 
-        # Markers on lines without the cursor are dimmed rather than styled.
-        base = theme.editor_style("Text")
-        marker_color = QColor(base.color or "#222222")
-        marker_color.setAlpha(70)
-        self.f_marker = QTextCharFormat()
-        self.f_marker.setForeground(marker_color)
 
     def _setup_inline_patterns(self) -> None:
         self._inline_patterns = [
@@ -146,6 +147,11 @@ class MarkdownHighlighter(QSyntaxHighlighter):
         self._spans_ready = True
         self.rehighlight()
 
+    def set_conceal_markers(self, enabled: bool) -> None:
+        """Crop markers on non-cursor lines (default) or show them."""
+        self._conceal_markers = bool(enabled)
+        self.rehighlight()
+
     def set_cursor_line(self, line: int) -> None:
         """Markers stay visible on the cursor's line and dim elsewhere."""
         if line == self._cursor_line:
@@ -155,6 +161,40 @@ class MarkdownHighlighter(QSyntaxHighlighter):
         for number in {previous, line}:
             if 0 <= number < document.blockCount():
                 self.rehighlightBlock(document.findBlockByNumber(number))
+
+    def _concealed_format(self, marker: str,
+                          style_fmt: QTextCharFormat) -> QTextCharFormat:
+        """A transparent, zero-advance format for ``marker``.
+
+        Negative absolute letter spacing equal to the run's average glyph
+        advance makes the run occupy zero width, so Qt's own layout crops it
+        without a custom document layout.
+        """
+        families = style_fmt.fontFamilies() or []
+        key = (marker, style_fmt.fontWeight(), style_fmt.fontItalic(),
+               tuple(families), style_fmt.fontPointSize())
+        cached = self._concealed_cache.get(key)
+        if cached is not None:
+            return cached
+        font = QFont(self.document().defaultFont())
+        if families:
+            font.setFamilies(families)
+        if style_fmt.fontPointSize() > 0:
+            font.setPointSizeF(style_fmt.fontPointSize())
+        font.setBold(style_fmt.fontWeight() >= QFont.Weight.Bold)
+        font.setItalic(style_fmt.fontItalic())
+        advance = QFontMetricsF(font).horizontalAdvance(marker)
+        spacing = -(advance / len(marker)) if marker else 0.0
+
+        fmt = QTextCharFormat(style_fmt)
+        fmt.setForeground(QColor(0, 0, 0, 0))
+        fmt.clearBackground()
+        fmt.setFontUnderline(False)
+        fmt.setFontStrikeOut(False)
+        fmt.setFontLetterSpacingType(QFont.SpacingType.AbsoluteSpacing)
+        fmt.setFontLetterSpacing(spacing)
+        self._concealed_cache[key] = fmt
+        return fmt
 
     def _format_for(self, style: str):
         return {
@@ -178,16 +218,21 @@ class MarkdownHighlighter(QSyntaxHighlighter):
             fmt = self._format_for(span.style)
             if fmt is not None and end > start:
                 self.setFormat(start, end - start, fmt)
-            if line == self._cursor_line:
+            if line == self._cursor_line or not self._conceal_markers:
                 continue
             content_start = max(start, min(span.content_start, block_end)
                                 - block_start)
             content_end = max(start, min(span.content_end, block_end)
                               - block_start)
+            style_fmt = fmt if fmt is not None else QTextCharFormat()
             if content_start > start:
-                self.setFormat(start, content_start - start, self.f_marker)
+                self.setFormat(start, content_start - start,
+                               self._concealed_format(text[start:content_start],
+                                                      style_fmt))
             if end > content_end:
-                self.setFormat(content_end, end - content_end, self.f_marker)
+                self.setFormat(content_end, end - content_end,
+                               self._concealed_format(text[content_end:end],
+                                                      style_fmt))
 
     def highlightBlock(self, text: str) -> None:
         block = self.currentBlock()

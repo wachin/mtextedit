@@ -18,8 +18,9 @@ _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from PyQt6.QtGui import QFont, QTextDocument
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtCore import QEventLoop, QTimer
+from PyQt6.QtGui import QFont, QTextCursor, QTextDocument
+from PyQt6.QtWidgets import QApplication, QTextEdit
 
 from mtextedit import mdparse
 from mtextedit.highlighter import MarkdownHighlighter
@@ -159,16 +160,52 @@ class SpanHighlightTest(unittest.TestCase):
         fmt = self._format(doc, "x")
         self.assertEqual(fmt.foreground().color().name(), "#005fff")
 
-    def test_markers_dim_off_the_cursor_line(self):
-        doc, highlighter = self._document("**bold**")
-        # Spans arrive with cursor line -1: markers are dimmed.
-        marker = self._format(doc, "**")
-        self.assertEqual(marker.foreground().color().alpha(), 70)
+    def test_markers_are_cropped_off_the_cursor_line(self):
+        doc, highlighter = self._document("line one\n\nx **bold** y")
+        block = doc.findBlockByNumber(2)
+        marker = HighlighterThemeTest._format_at(block, "**")
+        self.assertEqual(marker.foreground().color().alpha(), 0)
+        self.assertLess(marker.fontLetterSpacing(), 0)
+
+        highlighter.set_cursor_line(2)
+        marker = HighlighterThemeTest._format_at(block, "**")
+        self.assertEqual(marker.foreground().color().alpha(), 255)
+        self.assertEqual(marker.fontWeight(), QFont.Weight.Bold)
 
         highlighter.set_cursor_line(0)
-        marker = self._format(doc, "**")
+        highlighter.set_conceal_markers(False)
+        marker = HighlighterThemeTest._format_at(block, "**")
         self.assertEqual(marker.foreground().color().alpha(), 255)
-        self.assertEqual(self._format(doc, "bold").fontWeight(), QFont.Weight.Bold)
+
+    def test_cropped_markers_have_zero_advance(self):
+        text = "line one\n\nx **bold** y"
+        editor = QTextEdit()
+        editor.resize(400, 160)
+        editor.setPlainText(text)
+        highlighter = MarkdownHighlighter(editor.document())
+        highlighter.set_spans(mdparse.parse_document(text).spans)
+        highlighter.set_cursor_line(0)
+        editor.show()
+        loop = QEventLoop()
+        QTimer.singleShot(50, loop.quit)
+        loop.exec()
+
+        block = editor.document().findBlockByNumber(2)
+        start = block.text().index("**")
+        after = start + 2
+
+        def x_at(position: int) -> float:
+            cursor = QTextCursor(block)
+            cursor.setPosition(block.position() + position)
+            return editor.cursorRect(cursor).x()
+
+        self.assertAlmostEqual(x_at(start), x_at(after), delta=1.0)
+
+        highlighter.set_cursor_line(2)
+        loop = QEventLoop()
+        QTimer.singleShot(50, loop.quit)
+        loop.exec()
+        self.assertGreater(x_at(after) - x_at(start), 4.0)
 
 
 if __name__ == "__main__":
